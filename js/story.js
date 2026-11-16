@@ -40,7 +40,7 @@ const CHARACTERS = {
 
 const BACKGROUNDS = {
   campus: 'assets/bg/campus.svg',
-  lecture: 'assets/bg/lecture.svg',
+  lecture: 'assets/bg/classroom.jpg',
   cafeteria: 'assets/bg/cafeteria.svg',
   library: 'assets/bg/library.svg',
 };
