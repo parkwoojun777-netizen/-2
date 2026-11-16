@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice">
+<defs>
+<filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+<filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+<filter id="haze"><feGaussianBlur stdDeviation="14"/></filter>
+
+<linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#f3ede2"/><stop offset="1" stop-color="#e3d8c5"/>
+</linearGradient>
+<linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#cfc6b8"/><stop offset="1" stop-color="#aea392"/>
+</linearGradient>
+<linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#b9dcf3"/><stop offset="1" stop-color="#eef8ff"/>
+</linearGradient>
+</defs>
+<rect x="0.0" y="0.0" width="1280.0" height="720.0" fill="url(#wall)" />
+<rect x="0.0" y="60.0" width="420.0" height="330.0" fill="url(#win)" />
+<rect x="0.0" y="60.0" width="6.0" height="330.0" fill="#e9e4da" />
+<rect x="105.0" y="60.0" width="6.0" height="330.0" fill="#e9e4da" />
+<rect x="210.0" y="60.0" width="6.0" height="330.0" fill="#e9e4da" />
+<rect x="315.0" y="60.0" width="6.0" height="330.0" fill="#e9e4da" />
+<rect x="420.0" y="60.0" width="6.0" height="330.0" fill="#e9e4da" />
+<rect x="0.0" y="220.0" width="420.0" height="6.0" fill="#e9e4da" />
+<path d="M0 330 q60 -50 120 -10 t120 -10 t120 0 t60 0 V390 H0Z" fill="#8fc27a" opacity=".75"/>
+<rect x="520.0" y="200.0" width="760.0" height="190.0" fill="#d6cbb8" />
+<rect x="520.0" y="300.0" width="760.0" height="90.0" fill="#9fb4c2" />
+<rect x="520.0" y="292.0" width="760.0" height="12.0" fill="#e8eef2" />
+<ellipse cx="600" cy="292" rx="44" ry="10" fill="#c7d3db"/>
+<ellipse cx="740" cy="292" rx="44" ry="10" fill="#c7d3db"/>
+<ellipse cx="880" cy="292" rx="44" ry="10" fill="#c7d3db"/>
+<ellipse cx="1020" cy="292" rx="44" ry="10" fill="#c7d3db"/>
+<ellipse cx="1160" cy="292" rx="44" ry="10" fill="#c7d3db"/>
+<ellipse cx="1300" cy="292" rx="44" ry="10" fill="#c7d3db"/>
+<rect x="600.0" y="90.0" width="520.0" height="90.0" fill="#2f3e46" rx="6"/>
+<text x="630" y="125" font-family="sans-serif" font-size="22" fill="#f6efd8">오늘의 백반 4,500</text>
+<text x="880" y="125" font-family="sans-serif" font-size="22" fill="#f6efd8">돈까스 5,500</text>
+<text x="630" y="161" font-family="sans-serif" font-size="22" fill="#f6efd8">라면 3,000</text>
+<text x="880" y="161" font-family="sans-serif" font-size="22" fill="#f6efd8">비빔밥 5,000</text>
+<path d="M200 0 V70" stroke="#555" stroke-width="2"/>
+<path d="M166 100 Q200 50 234 100Z" fill="#2f3e46"/>
+<ellipse cx="200" cy="104" rx="60" ry="20" fill="#fff6d0" opacity=".6" filter="url(#soft)"/>
+<path d="M520 0 V70" stroke="#555" stroke-width="2"/>
+<path d="M486 100 Q520 50 554 100Z" fill="#2f3e46"/>
+<ellipse cx="520" cy="104" rx="60" ry="20" fill="#fff6d0" opacity=".6" filter="url(#soft)"/>
+<path d="M840 0 V70" stroke="#555" stroke-width="2"/>
+<path d="M806 100 Q840 50 874 100Z" fill="#2f3e46"/>
+<ellipse cx="840" cy="104" rx="60" ry="20" fill="#fff6d0" opacity=".6" filter="url(#soft)"/>
+<path d="M1160 0 V70" stroke="#555" stroke-width="2"/>
+<path d="M1126 100 Q1160 50 1194 100Z" fill="#2f3e46"/>
+<ellipse cx="1160" cy="104" rx="60" ry="20" fill="#fff6d0" opacity=".6" filter="url(#soft)"/>
+<path d="M0 390 H1280 V720 H0Z" fill="url(#floor)"/>
+<path d="M0 395 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 408 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 431 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 464 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 505 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 556 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 615 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<path d="M0 684 H1280" stroke="#9d9282" stroke-width="1" opacity=".5"/>
+<g transform="translate(80,470) scale(0.9)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#81b29a"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#e07a5f"/></g>
+<g transform="translate(420,470) scale(0.9)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#81b29a"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#e07a5f"/></g>
+<g transform="translate(760,470) scale(0.9)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#81b29a"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#81b29a"/></g>
+<g transform="translate(1090,470) scale(0.9)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#81b29a"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#81b29a"/></g>
+<g transform="translate(-60,600) scale(1.4)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#f2c14e"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#e07a5f"/></g>
+<g transform="translate(500,610) scale(1.4)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#f2c14e"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#81b29a"/></g>
+<g transform="translate(1050,610) scale(1.4)"><rect x="-30" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="170" y="-60" width="60" height="64" rx="8" fill="#e07a5f"/><rect x="-10" y="0" width="220" height="16" rx="3" fill="#f2efe8"/><rect x="20" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="170" y="16" width="10" height="70" fill="#7d7d7d"/><rect x="30" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="44" cy="-11" r="7" fill="#f2c14e"/><rect x="120" y="-8" width="56" height="10" rx="2" fill="#9db1bf"/><circle cx="134" cy="-11" r="7" fill="#f2c14e"/></g>
+</svg>

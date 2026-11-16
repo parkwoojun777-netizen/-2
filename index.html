@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>서하의 월요일</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="viewport">
+    <div id="stage">
+      <!-- 배경 (크로스페이드용 2장) -->
+      <div id="bg-layer">
+        <div class="bg" id="bg-a"></div>
+        <div class="bg" id="bg-b"></div>
+        <div id="tint"></div>
+      </div>
+
+      <!-- 캐릭터 -->
+      <div id="char-layer"></div>
+
+      <!-- 챕터 카드 -->
+      <div id="chapter-card" class="hidden">
+        <div class="chapter-sub"></div>
+        <div class="chapter-title"></div>
+      </div>
+
+      <!-- 선택지 -->
+      <div id="choices" class="hidden"></div>
+
+      <!-- 대사창 -->
+      <div id="textbox" class="hidden">
+        <div id="namebox" class="hidden"></div>
+        <div id="text"></div>
+        <div id="next-indicator">▼</div>
+      </div>
+
+      <!-- 퀵 메뉴 -->
+      <div id="quickmenu" class="hidden">
+        <button data-act="log">로그</button>
+        <button data-act="auto">자동</button>
+        <button data-act="skip">스킵</button>
+        <button data-act="save">저장</button>
+        <button data-act="load">불러오기</button>
+        <button data-act="hide">숨기기</button>
+        <button data-act="title">타이틀</button>
+      </div>
+
+      <!-- 화면 전환용 -->
+      <div id="fader"></div>
+
+      <!-- 타이틀 -->
+      <div id="title-screen">
+        <div class="title-bg"></div>
+        <img class="title-char" src="assets/characters/wink.png" alt="">
+        <div class="title-box">
+          <div class="title-logo">서하의 월요일</div>
+          <div class="title-sub">— 캠퍼스 일상 비주얼 노벨 —</div>
+          <div class="title-buttons">
+            <button data-title="new">새 게임</button>
+            <button data-title="continue">이어하기</button>
+            <button data-title="endings">엔딩 목록</button>
+          </div>
+        </div>
+        <div class="title-foot">클릭 / Space / Enter: 진행 · Ctrl: 스킵 · H: 숨기기 · L: 로그</div>
+      </div>
+
+      <!-- 모달 (로그 / 저장 / 불러오기 / 엔딩 / 확인) -->
+      <div id="modal" class="hidden">
+        <div class="modal-panel">
+          <div class="modal-head">
+            <span class="modal-title"></span>
+            <button class="modal-close">✕</button>
+          </div>
+          <div class="modal-body"></div>
+        </div>
+      </div>
+
+      <!-- 엔딩 화면 -->
+      <div id="ending-screen" class="hidden">
+        <div class="ending-label">ENDING</div>
+        <div class="ending-title"></div>
+        <button data-ending="title">타이틀로</button>
+      </div>
+
+      <div id="toast" class="hidden"></div>
+    </div>
+  </div>
+
+  <script src="js/story.js"></script>
+  <script src="js/engine.js"></script>
+</body>
+</html>
