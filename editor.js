@@ -42,6 +42,8 @@
           r.onupgradeneeded = () => r.result.createObjectStore("projects", { keyPath: "id" });
           r.onsuccess = () => res(r.result);
           r.onerror = () => rej(r.error);
+          r.onblocked = () => rej(new Error("blocked"));
+          setTimeout(() => rej(new Error("timeout")), 3000); // 응답이 없는 환경 대비
         } catch (e) { rej(e); }
       }).catch(() => { ok = false; return null; });
       return dbp;
@@ -1055,7 +1057,7 @@
     if (!engine.includes("window.VN")) { const s = document.getElementById("engine-src"); engine = s ? s.textContent : ""; }
     if (!engine) return toast("엔진 코드를 읽지 못했어요");
     const P = await bundledProject();
-    const esc = (s) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
+    const esc = (s) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!-{2}/g, "<\\!-" + "-"); // 주의: 이 파일 안에 HTML 주석 시작 기호를 그대로 쓰면 페이지에 넣었을 때 코드가 통째로 무시돼요
     const html = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
