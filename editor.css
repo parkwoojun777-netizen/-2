@@ -15,7 +15,7 @@
   --code-ink: #dbe6ff;
   /* 블록 종류 색 */
   --k-say: #2d7ff0; --k-narr: #7a8297; --k-scene: #1e9a6a; --k-char: #d0538f;
-  --k-flow: #c77a12; --k-var: #8b5cf6; --k-end: #c2364f;
+  --k-flow: #c77a12; --k-var: #8b5cf6; --k-end: #c2364f; --k-game: #e0533a;
   --f-ui: "Noto Sans KR", system-ui, sans-serif;
   --f-story: "Gowun Batang", "Noto Serif KR", serif;
   --f-code: "Nanum Gothic Coding", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -190,4 +190,5 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .paste { min-height: 0 !important; height: 46px; resize: none; text-align: center; font-size: 14px !important; color: var(--muted); border-style: dashed !important; }
 .img-status { font-size: 13px; color: var(--muted); min-height: 1em; }
 .img-status.err { color: var(--danger); }
-.block.k-cg { --kc: var(--k-scene); } .picker .k-cg { --kc: var(--k-scene); }
+.block.k-cg, .block.k-varimg { --kc: var(--k-scene); } .picker .k-cg, .picker .k-varimg { --kc: var(--k-scene); }
+.block.k-minigame, .picker .k-minigame { --kc: var(--k-game); }

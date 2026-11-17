@@ -13,6 +13,10 @@
    { choice: [ { text: "보기", goto: "장면", set: { 호감도: +1 } } ] } → 선택지
    { set: { 호감도: +1 } }  /  { set: { 이름: "=샬럿" } } → 변수 더하기 / 값 정하기
    { if: "호감도 >= 2", goto: "좋은엔딩", else: "보통엔딩" } → 조건 분기
+   { varImage: "charlotte", cases: [ { if: "호감도 >= 2", image: "smile" } ], else: "pout" }
+                                        → 변수에 따라 다른 그림 (varImage: "bg" / "cg" / 캐릭터 코드 이름)
+   { minigame: "mash", time: 5, goal: 30, win: "성공장면", lose: "실패장면", winSet: { 호감도: +1 } }
+                                        → 미니게임 (quiz / timing / mash / memory / guess)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
    ===================================================================== */
@@ -86,7 +90,12 @@ const PROJECT = {
       { goto: "공통" },
     ],
     공통: [
-      { say: "샬럿", face: "normal", text: "있잖아. 내일 시간 있어?" },
+      "그때, 열린 창문으로 바람이 훅 불어 들어왔다.",
+      { shake: true },
+      { say: "샬럿", face: "shy", text: "앗, 프린트가……!" },
+      { minigame: "mash", title: "날아가는 프린트 줍기", time: 5, goal: 25, winSet: { 호감도: +1 }, retry: true },
+      { varImage: "charlotte", cases: [ { if: "호감도 >= 2", image: "smile" } ], else: "normal" },
+      "샬럿: 있잖아. 내일 시간 있어?",
       { choice: [
         { text: "있어.", goto: "약속", set: { 호감도: +1 } },
         { text: "글쎄, 왜?", goto: "판정" },

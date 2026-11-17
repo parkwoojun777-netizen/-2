@@ -141,6 +141,7 @@
     narr:   { label: "나레이션",    desc: "이름 없는 설명 글" },
     bg:     { label: "배경",        desc: "배경 그림을 바꿔요" },
     cg:     { label: "이벤트 그림", desc: "그림을 화면 가득 보여줘요" },
+    varimg: { label: "변수 그림",   desc: "변수에 따라 다른 그림" },
     show:   { label: "캐릭터 등장", desc: "등장 / 표정 / 위치" },
     hide:   { label: "캐릭터 퇴장", desc: "화면에서 사라져요" },
     choice: { label: "선택지",      desc: "플레이어가 골라요" },
@@ -149,6 +150,7 @@
     goto:   { label: "장면 이동",   desc: "다른 장면으로" },
     fx:     { label: "효과",        desc: "흔들기 · 번쩍 · 암전" },
     wait:   { label: "잠깐 멈춤",   desc: "몇 초 쉬어요" },
+    minigame: { label: "미니게임",  desc: "퀴즈·연타·타이밍·짝맞추기" },
     end:    { label: "엔딩",        desc: "게임을 끝내요" },
   };
   const SAY_RE = VN.SAY_RE;
@@ -158,6 +160,8 @@
   function kindOf(b) {
     if (typeof b === "string") return SAY_RE.test(b) ? "say" : "narr";
     if (!b || typeof b !== "object") return "raw";
+    if (b.minigame) return "minigame";
+    if (b.varImage !== undefined) return "varimg";
     if (b.choice) return "choice";
     if (b.say !== undefined) return "say";
     if (b.text !== undefined) return "narr";
@@ -188,6 +192,27 @@
     return { [f.var]: "=" + f.val };
   }
 
+  function parseCond(expr) {
+    const m = String(expr || "").match(/^\s*(\S+)\s*(>=|<=|==|!=|>|<)\s*(.+?)\s*$/);
+    return m ? { var: m[1], op: m[2], val: m[3] } : { var: String(expr || "").trim(), op: "==", val: "true" };
+  }
+  const MG = {
+    quiz:   { name: "퀴즈",          desc: "문제를 내고 보기 중 정답을 고르게 해요", score: "정답이면 1, 아니면 0" },
+    timing: { name: "타이밍 맞추기", desc: "움직이는 막대가 칸 안에 올 때 누르기", score: "성공한 횟수" },
+    mash:   { name: "연타하기",      desc: "정해진 시간 안에 버튼 많이 누르기", score: "누른 횟수" },
+    memory: { name: "짝 맞추기",     desc: "같은 그림 카드 두 장 찾기", score: "찾은 짝 개수" },
+    guess:  { name: "숫자 맞추기",   desc: "업다운 힌트로 숫자 맞히기", score: "맞히는 데 쓴 횟수" },
+  };
+  const MG_FIELDS = { quiz: ["question", "options", "answer", "time"], timing: ["rounds", "need", "speed"], mash: ["time", "goal"], memory: ["pairs", "time"], guess: ["max", "tries"] };
+  const MG_DEFAULT = { title: "", question: "", options: ["", ""], answer: 0, time: 0, rounds: 3, need: 2, speed: 2, goal: 30, pairs: 4, max: 50, tries: 6, win: "", lose: "", score: "", retry: true };
+  function imageChoices(target) {
+    if (target === "bg") return Object.fromEntries(Object.keys(proj.backgrounds).map((n) => [n, n]));
+    if (target === "cg") return Object.assign({ "": "숨기기" }, Object.fromEntries(Object.keys(proj.cgs).map((n) => [n, n])));
+    const c = proj.characters[target];
+    return c ? Object.fromEntries(Object.keys(c.faces || {}).map((n) => [n, n])) : {};
+  }
+  const targetName = (t) => (t === "bg" ? "배경" : t === "cg" ? "이벤트 그림" : `${charName(t)} 표정`);
+
   function toForm(b) {
     const k = kindOf(b);
     switch (k) {
@@ -209,6 +234,18 @@
       case "wait": return { sec: (b.wait || 1000) / 1000 };
       case "fx": return { fx: b.shake ? "shake" : b.flash ? "flash:" + b.flash : "fade:" + b.fade };
       case "end": return { name: b.end };
+      case "varimg": return {
+        target: b.varImage, fit: b.fit || "contain",
+        cases: (b.cases || []).map((x) => Object.assign(parseCond(x.if), { image: x.image == null ? "" : x.image })),
+        else: b.else === undefined ? "__keep" : b.else };
+      case "minigame": {
+        const f = Object.assign(clone(MG_DEFAULT), clone(b), { type: b.minigame });
+        delete f.minigame;
+        const ws = b.winSet ? parseSetEntry(b.winSet) : { var: "", op: "+", val: "1" };
+        f.wsVar = ws.var; f.wsOp = ws.op; f.wsVal = ws.val; delete f.winSet;
+        f.retry = !!b.retry;
+        return f;
+      }
       case "choice": return { options: b.choice.map((o) => Object.assign({ text: o.text, goto: o.goto || "" }, o.set ? parseSetEntry(o.set) : { var: "", op: "+", val: "1" }, { if: o.if || "" })) };
       default: return { raw: b };
     }
@@ -232,6 +269,28 @@
       case "wait": return { wait: Math.max(100, Math.round((+f.sec || 1) * 1000)) };
       case "fx": { const [a, c] = f.fx.split(":"); return a === "shake" ? { shake: true } : { [a]: c }; }
       case "end": return { end: f.name || "THE END" };
+      case "varimg": {
+        const o = { varImage: f.target, cases: f.cases.filter((c) => c.var).map((c) => ({ if: `${c.var} ${c.op} ${c.val}`, image: c.image })) };
+        if (f.else !== "__keep") o.else = f.else;
+        if (f.target === "cg" && f.fit === "cover") o.fit = "cover";
+        return o;
+      }
+      case "minigame": {
+        const o = { minigame: f.type };
+        if (f.title) o.title = f.title;
+        for (const k of MG_FIELDS[f.type]) {
+          if (k === "question") o.question = f.question;
+          else if (k === "options") o.options = f.options.map((x) => x || "…");
+          else if (k === "time" && !(+f.time > 0)) continue;
+          else o[k] = Number(f[k]) || 0;
+        }
+        if (f.win) o.win = f.win;
+        if (f.lose) o.lose = f.lose;
+        if (f.score) o.score = f.score;
+        const ws = buildSet({ var: f.wsVar, op: f.wsOp, val: f.wsVal }); if (ws) o.winSet = ws;
+        if (f.retry) o.retry = true;
+        return o;
+      }
       case "choice": return { choice: f.options.map((o) => { const r = { text: o.text || "…" }; if (o.goto) r.goto = o.goto; const s = buildSet(o); if (s) r.set = s; if (o.if) r.if = o.if; return r; }) };
       default: return f.raw;
     }
@@ -255,6 +314,12 @@
       case "wait": return { sec: 1 };
       case "fx": return { fx: "shake" };
       case "end": return { name: "THE END" };
+      case "varimg": {
+        const target = Object.keys(proj.cgs).length ? "cg" : Object.keys(proj.characters)[0] || "bg";
+        const first = Object.keys(imageChoices(target)).find((x) => x) || "";
+        return { target, fit: "contain", cases: [{ var: vars[0] || "", op: ">=", val: "1", image: first }], else: "__keep" };
+      }
+      case "minigame": return Object.assign(clone(MG_DEFAULT), { type: "quiz", wsVar: "", wsOp: "+", wsVal: "1" });
       case "choice": return { options: [{ text: "", goto: "", var: "", op: "+", val: "1", if: "" }, { text: "", goto: "", var: "", op: "+", val: "1", if: "" }] };
     }
   }
@@ -277,6 +342,11 @@
       case "wait": return `${f.sec}초 멈춤`;
       case "fx": return FX[f.fx] || f.fx;
       case "end": return `🏁 ${f.name}`;
+      case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기`),
+        f.cases.map((c) => h("div", { class: "opt" }, `▸ ${c.var} ${c.op} ${c.val} 이면 → ${c.image || "숨기기"}`)),
+        f.else !== "__keep" ? h("div", { class: "opt" }, `▸ 그 밖에는 → ${f.else || "숨기기"}`) : null];
+      case "minigame": return [h("div", {}, `🎮 ${(MG[f.type] || { name: f.type }).name}${f.title ? ` · ${f.title}` : ""}`),
+        h("div", { class: "opt" }, `성공 → ${f.win || "다음 블록"} · 실패 → ${f.lose || "다음 블록"}${f.wsVar ? ` · 성공 시 ${setText(buildSet({ var: f.wsVar, op: f.wsOp, val: f.wsVal }))}` : ""}`)];
       case "choice": return f.options.map((o) => h("div", { class: "opt" }, `▸ ${o.text} → ${o.goto || "(다음 블록)"}`, o.var ? `  [${setText(buildSet(o))}]` : ""));
       default: return "직접 쓴 코드 블록";
     }
@@ -326,6 +396,12 @@
         if (k === "goto" && !scn(f.goto)) out.push(`${at}: 이동할 장면 "${f.goto}" 이 없어요.`);
         if (k === "if") { if (!scn(f.goto)) out.push(`${at}: 조건이 맞을 때 갈 장면 "${f.goto}" 이 없어요.`); if (f.else && !scn(f.else)) out.push(`${at}: 아닐 때 갈 장면 "${f.else}" 이 없어요.`); }
         if (k === "choice") f.options.forEach((o) => o.goto && !scn(o.goto) && out.push(`${at}: 선택지 "${o.text}" 의 장면 "${o.goto}" 이 없어요.`));
+        if (k === "minigame") { if (f.win && !scn(f.win)) out.push(`${at}: 미니게임 성공 시 갈 장면 "${f.win}" 이 없어요.`); if (f.lose && !scn(f.lose)) out.push(`${at}: 미니게임 실패 시 갈 장면 "${f.lose}" 이 없어요.`); }
+        if (k === "varimg") {
+          const ok = imageChoices(f.target);
+          if (f.target !== "bg" && f.target !== "cg" && !proj.characters[f.target]) out.push(`${at}: 캐릭터 "${f.target}" 이 없어요.`);
+          else [...f.cases.map((c) => c.image), f.else === "__keep" ? undefined : f.else].forEach((im) => im !== undefined && !(im in ok) && out.push(`${at}: 변수 그림의 "${im || "(빈 칸)"}" 그림이 없어요.`));
+        }
         if (k === "bg" && !proj.backgrounds[f.bg]) out.push(`${at}: 배경 "${f.bg}" 이 없어요.`);
         if (k === "cg" && f.cg && !proj.cgs[f.cg]) out.push(`${at}: 이벤트 그림 "${f.cg}" 이 없어요.`);
         if ((k === "show" || k === "hide") && f.id !== "all" && !proj.characters[f.id]) out.push(`${at}: 캐릭터 "${f.id}" 이 없어요.`);
@@ -523,6 +599,76 @@
       case "wait": return [field("몇 초?", inp("sec", { type: "number", min: "0.1", step: "0.5" }))];
       case "fx": return [field("효과", sel("fx", FX))];
       case "end": return [field("엔딩 이름", inp("name", { placeholder: "예: GOOD END — 약속" }))];
+      case "varimg": {
+        const targets = { bg: "배경", cg: "이벤트 그림" };
+        Object.entries(proj.characters).forEach(([id, c]) => (targets[id] = `${c.name}의 표정`));
+        const imgs = imageChoices(f.target);
+        const imgSel = (val, on) => h("select", { onchange: (e) => { on(e.target.value); redraw(); } },
+          Object.entries(imgs).map(([v, t]) => h("option", { value: v, selected: v === val }, t)),
+          val && !(val in imgs) ? h("option", { value: val, selected: true }, `⚠ ${val}`) : null);
+        const preview = (val) => {
+          const ref = f.target === "bg" ? proj.backgrounds[val] : f.target === "cg" ? proj.cgs[val] : ((proj.characters[f.target] || {}).faces || {})[val];
+          return ref ? h("div", { class: "face-row", style: { gridTemplateColumns: "64px 1fr" } }, h("div", { class: "pic", style: { backgroundImage: `url("${imgSrc(ref)}")` } }), h("span", { class: "hint" }, val)) : null;
+        };
+        return [
+          h("p", { class: "hint" }, "변수 값에 따라 다른 그림을 보여줘요. 위 조건부터 차례로 확인해서 처음 맞는 조건의 그림을 써요."),
+          noVarsHint(),
+          field("무엇을 바꿀까요?", h("select", { onchange: (e) => {
+            f.target = e.target.value; const first = Object.keys(imageChoices(f.target)).find((x) => x) || "";
+            f.cases.forEach((c) => (c.image = first)); if (f.else !== "__keep") f.else = first; redraw();
+          } }, Object.entries(targets).map(([v, t]) => h("option", { value: v, selected: v === f.target }, t)))),
+          !Object.keys(imgs).filter((x) => x).length ? h("p", { class: "hint", style: { color: "var(--danger)" } }, "고를 그림이 없어요. [그림] 탭에서 먼저 올려 주세요.") : null,
+          f.target === "cg" ? field("맞추기", sel("fit", { contain: "그림 전체 보이기", cover: "화면 꽉 채우기" })) : null,
+          f.cases.map((c, j) => h("div", { class: "opt-card" },
+            h("div", { class: "row" }, h("b", { style: { flex: "none" } }, j === 0 ? "만약" : "아니고 만약"),
+              h("button", { class: "btn danger", style: { flex: "none", marginLeft: "auto", padding: "5px 10px" }, onclick: () => { f.cases.splice(j, 1); redraw(); } }, "빼기")),
+            h("div", { class: "grid3" },
+              field("변수", varsSelect(c.var, (v) => { c.var = v; upd(); })),
+              field("비교", h("select", { onchange: (e) => { c.op = e.target.value; upd(); } }, [">=", "<=", ">", "<", "==", "!="].map((x) => h("option", { value: x, selected: c.op === x }, x)))),
+              field("값", h("input", { type: "text", value: c.val, oninput: (e) => { c.val = e.target.value; upd(); } }))),
+            field("이면 이 그림", imgSel(c.image, (v) => (c.image = v))), preview(c.image))),
+          h("button", { class: "btn dashed wide", onclick: () => { f.cases.push({ var: Object.keys(proj.vars)[0] || "", op: ">=", val: "1", image: Object.keys(imgs).find((x) => x) || "" }); redraw(); } }, "+ 조건 추가"),
+          field("어느 조건에도 안 맞으면", h("select", { onchange: (e) => { f.else = e.target.value; redraw(); } },
+            h("option", { value: "__keep", selected: f.else === "__keep" }, "그대로 두기"),
+            Object.entries(imgs).map(([v, t]) => h("option", { value: v, selected: v === f.else }, t)))),
+          f.else !== "__keep" ? preview(f.else) : null,
+        ];
+      }
+      case "minigame": {
+        const num = (key, label, attrs) => field(label, h("input", Object.assign({ type: "number", value: f[key], oninput: (e) => { f[key] = e.target.value; upd(); } }, attrs)));
+        const parts = [
+          field("게임 종류", h("select", { onchange: (e) => { f.type = e.target.value; redraw(); } },
+            Object.entries(MG).map(([v, m]) => h("option", { value: v, selected: v === f.type }, `${m.name} — ${m.desc}`)))),
+          field("제목 (선택)", inp("title", { placeholder: MG[f.type].name })),
+        ];
+        if (f.type === "quiz") {
+          parts.push(field("문제", area("question", "예: 샬럿이 좋아하는 계절은?")));
+          f.options.forEach((o, j) => parts.push(h("div", { class: "row" },
+            h("input", { type: "radio", name: "mg-answer", checked: +f.answer === j, "aria-label": `보기 ${j + 1} 정답`, style: { width: "22px", height: "22px", flex: "none" }, onchange: () => { f.answer = j; upd(); } }),
+            h("input", { type: "text", value: o, placeholder: `보기 ${j + 1}`, style: { flex: 1 }, oninput: (e) => { f.options[j] = e.target.value; upd(); } }),
+            f.options.length > 2 ? h("button", { class: "btn danger", style: { padding: "6px 10px" }, onclick: () => { f.options.splice(j, 1); if (+f.answer >= f.options.length) f.answer = 0; redraw(); } }, "빼기") : null)));
+          parts.push(h("p", { class: "hint" }, "왼쪽 동그라미로 정답을 골라요."));
+          if (f.options.length < 6) parts.push(h("button", { class: "btn dashed wide", onclick: () => { f.options.push(""); redraw(); } }, "+ 보기 추가"));
+          parts.push(num("time", "제한 시간 (초, 0 = 없음)", { min: "0" }));
+        }
+        if (f.type === "timing") parts.push(h("div", { class: "grid3" }, num("rounds", "기회", { min: "1" }), num("need", "필요한 성공", { min: "1" }),
+          field("속도", sel("speed", { 1: "1 아주 느림", 2: "2 느림", 3: "3 보통", 4: "4 빠름", 5: "5 아주 빠름" }))));
+        if (f.type === "mash") parts.push(h("div", { class: "grid2" }, num("time", "시간 (초)", { min: "1" }), num("goal", "목표 횟수", { min: "1" })));
+        if (f.type === "memory") parts.push(h("div", { class: "grid2" }, field("짝 개수", sel("pairs", { 2: "2쌍 (아주 쉬움)", 3: "3쌍", 4: "4쌍", 5: "5쌍", 6: "6쌍", 8: "8쌍 (어려움)" })), num("time", "제한 시간 (초, 0 = 없음)", { min: "0" })));
+        if (f.type === "guess") parts.push(h("div", { class: "grid2" }, num("max", "1부터 몇까지?", { min: "2" }), num("tries", "기회", { min: "1" })));
+        parts.push(
+          h("b", {}, "결과"),
+          h("div", { class: "grid2" },
+            field("성공하면 갈 장면", scenesSelect(f.win, (v) => { f.win = v; upd(); }, "다음 블록 계속")),
+            field("실패하면 갈 장면", scenesSelect(f.lose, (v) => { f.lose = v; upd(); }, "다음 블록 계속"))),
+          h("div", { class: "grid3" },
+            field("성공하면 변수", varsSelect(f.wsVar, (v) => { f.wsVar = v; upd(); }, "안 바꿈")),
+            field("어떻게", h("select", { onchange: (e) => { f.wsOp = e.target.value; upd(); } }, ["+", "-", "="].map((x) => h("option", { value: x, selected: f.wsOp === x }, x)))),
+            field("값", h("input", { type: "text", value: f.wsVal, oninput: (e) => { f.wsVal = e.target.value; upd(); } }))),
+          field(`점수를 변수에 저장 (점수 = ${MG[f.type].score})`, varsSelect(f.score, (v) => { f.score = v; upd(); }, "저장 안 함")),
+          h("label", { class: "check" }, h("input", { type: "checkbox", checked: f.retry, onchange: (e) => { f.retry = e.target.checked; upd(); } }), "실패하면 [다시 도전] 버튼 보여주기"));
+        return parts;
+      }
       case "choice": {
         const cards = f.options.map((o, j) => h("div", { class: "opt-card" },
           h("div", { class: "row" }, h("b", { style: { flex: "none" } }, `보기 ${j + 1}`),
@@ -564,6 +710,7 @@
       if (typeof b !== "object" || !b) return;
       if (b.goto === from) b.goto = to;
       if (b.else === from) b.else = to;
+      if (b.minigame) { if (b.win === from) b.win = to; if (b.lose === from) b.lose = to; }
       if (b.choice) b.choice.forEach((o) => { if (o.goto === from) o.goto = to; });
     });
   }
@@ -752,7 +899,10 @@
       const key = isBg ? "bg" : "cg";
       if (!isNew && v !== name) {
         delete M[name];
-        eachBlock((b) => { if (b && b[key] === name) b[key] = v; });
+        eachBlock((b) => {
+          if (b && b[key] === name) b[key] = v;
+          if (b && b.varImage === key) { (b.cases || []).forEach((c) => { if (c.image === name) c.image = v; }); if (b.else === name) b.else = v; }
+        });
         if (isBg && proj.titleBg === name) proj.titleBg = v;
       }
       M[v] = st.ref;
@@ -816,7 +966,7 @@
       const c = { name: st.name.trim(), color: st.color, faces: Object.fromEntries(st.faces.map((f) => [f.k, f.v])) };
       if (!isNew && st.id !== id) {
         const C = {}; for (const [k, v] of Object.entries(proj.characters)) C[k === id ? st.id : k] = v; proj.characters = C;
-        eachBlock((b) => { if (b && b.show === id) b.show = st.id; if (b && b.hide === id) b.hide = st.id; });
+        eachBlock((b) => { if (b && b.show === id) b.show = st.id; if (b && b.hide === id) b.hide = st.id; if (b && b.varImage === id) b.varImage = st.id; });
       }
       proj.characters[st.id] = c;
       if (oldName && oldName !== c.name) {
@@ -845,6 +995,8 @@
       if (b.set && name in b.set) n++;
       if (b.if && String(b.if).trim().split(/\s+/)[0] === name) n++;
       if (b.choice) b.choice.forEach((o) => { if (o.set && name in o.set) n++; if (o.if && o.if.trim().split(/\s+/)[0] === name) n++; });
+      if (b.cases) b.cases.forEach((c) => { if (String(c.if).trim().split(/\s+/)[0] === name) n++; });
+      if (b.minigame) { if (b.score === name) n++; if (b.winSet && name in b.winSet) n++; }
     });
     return n;
   }
@@ -856,6 +1008,8 @@
       if (!b || typeof b !== "object") return;
       fixSet(b.set); if (b.if) b.if = fixIf(b.if);
       if (b.choice) b.choice.forEach((o) => { fixSet(o.set); if (o.if) o.if = fixIf(o.if); });
+      if (b.cases) b.cases.forEach((c) => (c.if = fixIf(c.if)));
+      if (b.minigame) { if (b.score === from) b.score = to; fixSet(b.winSet); }
     });
   }
   function renderVars(w) {
@@ -954,7 +1108,9 @@
         '{ if: "호감도 >= 3", goto: "고백", else: "친구엔딩" }'),
       L("6. 이벤트 그림 — 그림 한 장 크게", "cgs 에 그림을 등록해 두고 { cg: \"이름\" } 으로 보여주고, { cg: \"\" } 로 숨겨요. 빈 문자열 \"\" 은 '아무것도 없음'이라는 뜻이에요.",
         'cgs: { 옥상_노을: "img:..." },\n\n{ cg: "옥상_노을" }   // 보여주기\n"샬럿: 예쁘다…"\n{ cg: "" }            // 숨기기'),
-      L("7. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("7. 변수 그림과 미니게임", "varImage 는 cases 목록을 위에서부터 확인해서 처음 맞는 조건의 그림을 보여줘요. minigame 은 결과에 따라 win / lose 장면으로 가요.",
+        '{ varImage: "charlotte",\n  cases: [ { if: "호감도 >= 3", image: "smile" } ],\n  else: "pout" }\n\n{ minigame: "mash", time: 5, goal: 30,\n  win: "성공장면", lose: "실패장면",\n  winSet: { 호감도: +1 } }'),
+      L("8. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {

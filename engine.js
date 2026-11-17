@@ -74,6 +74,25 @@
   .vn-toast{position:absolute;z-index:30;left:50%;top:20%;transform:translate(-50%,-10px);background:var(--vn-accent);color:#0b1020;padding:8px 18px;border-radius:999px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
   .vn-toast.on{opacity:1;transform:translate(-50%,0)}
   .vn-error{color:#ffb4b4}
+  .vn-mg{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,18,.72);cursor:default}
+  .vn-mg-card{width:min(520px,100%);max-height:100%;overflow:auto;background:#10162a;border:1px solid var(--vn-line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;text-align:center;animation:vn-pop .25s both}
+  .vn-mg h2{margin:0;font-family:"Gowun Batang",serif;font-size:22px}
+  .vn-mg p{margin:0;opacity:.85;font-size:15px;line-height:1.6;word-break:keep-all}
+  .vn-mg .vn-q{font-family:"Gowun Batang",serif;font-size:18px;opacity:1}
+  .vn-mg .big{font-size:42px;font-weight:700;font-variant-numeric:tabular-nums}
+  .vn-mg-btn{padding:14px;border-radius:12px;background:#182038;border:1px solid var(--vn-line);font-size:16px}
+  .vn-mg-btn:active{background:#24305a}
+  .vn-mg-btn.primary{background:var(--vn-accent);color:#0b1020;font-weight:700;border-color:var(--vn-accent)}
+  .vn-bar{position:relative;height:48px;border-radius:10px;background:#0b0f1d;border:1px solid var(--vn-line);overflow:hidden}
+  .vn-zone{position:absolute;top:0;bottom:0;background:rgba(143,211,255,.35);border-left:2px solid var(--vn-accent);border-right:2px solid var(--vn-accent)}
+  .vn-mark{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;background:#fff;box-shadow:0 0 10px #fff}
+  .vn-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .vn-card{aspect-ratio:3/4;border-radius:10px;background:#182038;border:1px solid var(--vn-line);font-size:28px;display:flex;align-items:center;justify-content:center;padding:0}
+  .vn-card.open{background:#f3f6ff;color:#000}.vn-card.done{opacity:.4}
+  .vn-mash{width:170px;height:170px;border-radius:50%;margin:0 auto;font-size:24px;font-weight:700;background:var(--vn-accent);color:#0b1020;border:0;user-select:none;-webkit-user-select:none}
+  .vn-mash:active{transform:scale(.94)}
+  .vn-mg input{padding:12px;font-size:20px;border-radius:10px;border:1px solid var(--vn-line);background:#0b0f1d;color:#fff;text-align:center;width:100%}
+  .vn-timer{height:6px;background:#0b0f1d;border-radius:3px;overflow:hidden}.vn-timer i{display:block;height:100%;width:100%;background:var(--vn-accent)}
   `;
 
   const HTML = `
@@ -82,6 +101,7 @@
     <div class="vn-chars"></div>
     <div class="vn-cg"></div>
     <div class="vn-choices" hidden></div>
+    <div class="vn-mg" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
     <div class="vn-menu">
       <button class="vn-exit" data-a="exit" hidden>✕ 테스트 종료</button>
@@ -129,7 +149,7 @@
     const el = {
       stage: q(".vn-stage"), bg: q(".vn-bg"), bg2: q(".vn-bg2"), chars: q(".vn-chars"),
       cg: q(".vn-cg"), box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
-      choices: q(".vn-choices"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
+      choices: q(".vn-choices"), mg: q(".vn-mg"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
       panel: q(".vn-panel"), panelTitle: q(".vn-panel-title"), panelBody: q(".vn-panel-body"), toastEl: q(".vn-toast"),
     };
 
@@ -354,6 +374,8 @@
           return;
         }
         if (cmd.text !== undefined) { showLine("", cmd.text); return; }
+        if (cmd.minigame) return minigame(cmd);
+        if (cmd.varImage !== undefined) applyVarImage(cmd);
         if (cmd.bg) setBg(cmd.bg);
         if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {
@@ -372,6 +394,191 @@
         if (cmd.fade) { el.box.hidden = true; return fadeThrough(cmd.fade, () => { el.box.hidden = false; run(); }); }
         if (cmd.wait) { el.box.hidden = true; later(() => { el.box.hidden = false; run(); }, skip ? 0 : cmd.wait); return; }
       }
+    }
+
+    // ---------- 변수 그림: 변수 값에 따라 다른 그림 ----------
+    function applyVarImage(c) {
+      const hit = (c.cases || []).find((x) => evalCond(x.if));
+      const im = hit ? hit.image : c.else;
+      if (im === undefined || im === null) return; // 맞는 조건이 없고 else 도 없으면 그대로
+      const t = c.varImage;
+      if (t === "bg") { if (im) setBg(im); }
+      else if (t === "cg") setCg(im, c.fit);
+      else if (CHARS[t]) {
+        const prev = S.chars[t] || {};
+        S.chars[t] = { face: im || prev.face || "normal", pos: c.pos || prev.pos || "center" };
+        renderChars();
+      }
+    }
+
+    // ---------- 미니게임 ----------
+    const MG_NAMES = { quiz: "퀴즈", timing: "타이밍 맞추기", mash: "연타하기", memory: "짝 맞추기", guess: "숫자 맞추기" };
+    let mgTimers = [], mgRaf = 0;
+    const mgLater = (fn, ms) => mgTimers.push(later(fn, ms));
+    function mgClear() { mgTimers.forEach(clearTimeout); mgTimers = []; cancelAnimationFrame(mgRaf); }
+    function add(parent, tag, text, cls) {
+      const e = document.createElement(tag);
+      if (text != null) e.textContent = text;
+      if (cls) e.className = cls;
+      parent.appendChild(e); return e;
+    }
+    const mgBtn = (parent, text, primary) => add(parent, "button", text, "vn-mg-btn" + (primary ? " primary" : ""));
+    function timerBar(card, sec, onEnd) {
+      if (!(sec > 0)) return;
+      const bar = add(card, "div", null, "vn-timer"), fill = add(bar, "i");
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.transition = `width ${sec}s linear`; fill.style.width = "0%"; }));
+      mgLater(onEnd, sec * 1000);
+    }
+    const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+    const GAMES = {
+      quiz(card, c, done) {
+        add(card, "p", c.question || "문제", "vn-q");
+        timerBar(card, +c.time, () => done(false, 0));
+        (c.options || []).forEach((o, i) => { mgBtn(card, o).onclick = () => { const ok = i === (+c.answer || 0); done(ok, ok ? 1 : 0); }; });
+      },
+      timing(card, c, done) {
+        const rounds = +c.rounds || 3, need = Math.min(rounds, +c.need || 2), speed = Math.min(5, Math.max(1, +c.speed || 2));
+        const zw = 30 - speed * 4;
+        let round = 0, hits = 0, z0 = 0, t0 = 0, pos = 0, running = false;
+        const info = add(card, "p", "");
+        const bar = add(card, "div", null, "vn-bar"), zone = add(bar, "div", null, "vn-zone"), mark = add(bar, "div", null, "vn-mark");
+        const b = mgBtn(card, "지금!", true);
+        function next() {
+          if (hits >= need || hits + (rounds - round) < need) return done(hits >= need, hits);
+          info.textContent = `${round + 1} / ${rounds} 번째 · 성공 ${hits}번 (필요 ${need}번)`;
+          z0 = 8 + Math.random() * (84 - zw); zone.style.left = z0 + "%"; zone.style.width = zw + "%";
+          t0 = performance.now(); running = true; loop();
+        }
+        function loop() {
+          if (!running || dead) return;
+          const t = ((performance.now() - t0) / 1000) * speed * 0.55, ph = t % 2;
+          pos = (ph < 1 ? ph : 2 - ph) * 100; mark.style.left = pos + "%";
+          mgRaf = requestAnimationFrame(loop);
+        }
+        b.onclick = () => {
+          if (!running) return;
+          running = false; cancelAnimationFrame(mgRaf);
+          const hit = pos >= z0 && pos <= z0 + zw;
+          if (hit) hits++;
+          info.textContent = hit ? "✔ 성공!" : "✘ 빗나갔어요";
+          round++; mgLater(next, 700);
+        };
+        next();
+      },
+      mash(card, c, done) {
+        const T = +c.time || 5, goal = +c.goal || 30;
+        let n = 0, started = false, over = false;
+        const big = add(card, "div", "0", "big");
+        add(card, "p", `목표 ${goal}번 · ${T}초 (처음 누르는 순간 시작)`);
+        const bar = add(card, "div", null, "vn-timer"), fill = add(bar, "i");
+        const b = add(card, "button", "눌러!", "vn-mash");
+        b.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          if (over) return;
+          if (!started) {
+            started = true;
+            requestAnimationFrame(() => { fill.style.transition = `width ${T}s linear`; fill.style.width = "0%"; });
+            mgLater(() => { over = true; done(n >= goal, n); }, T * 1000);
+          }
+          n++; big.textContent = n;
+        });
+      },
+      memory(card, c, done) {
+        const pairs = Math.min(8, Math.max(2, +c.pairs || 4));
+        const EM = ["🍓", "🌙", "⭐", "🎀", "🐱", "🌸", "🍀", "🎵"];
+        const deck = shuffle([...EM.slice(0, pairs), ...EM.slice(0, pairs)]);
+        let open = [], found = 0, moves = 0, lock = false;
+        const info = add(card, "p", "");
+        timerBar(card, +c.time, () => done(false, found));
+        const grid = add(card, "div", null, "vn-cards");
+        if (pairs <= 3) grid.style.gridTemplateColumns = "repeat(3,1fr)";
+        const upd = () => (info.textContent = `찾은 짝 ${found} / ${pairs} · 뒤집은 횟수 ${moves}`);
+        deck.forEach((em) => {
+          const d = add(grid, "button", "?", "vn-card");
+          d.onclick = () => {
+            if (lock || d.classList.contains("open")) return;
+            d.classList.add("open"); d.textContent = em; open.push([d, em]);
+            if (open.length === 2) {
+              moves++; lock = true;
+              const [a, b] = open;
+              if (a[1] === b[1]) {
+                a[0].classList.add("done"); b[0].classList.add("done"); found++; open = []; lock = false;
+                if (found === pairs) mgLater(() => done(true, found), 400);
+              } else mgLater(() => { [a, b].forEach(([x]) => { x.classList.remove("open"); x.textContent = "?"; }); open = []; lock = false; }, 700);
+            }
+            upd();
+          };
+        });
+        upd();
+      },
+      guess(card, c, done) {
+        const max = +c.max || 50, tries = +c.tries || 6, ans = 1 + Math.floor(Math.random() * max);
+        let left = tries;
+        const info = add(card, "p", `1 ~ ${max} · 남은 기회 ${left}번`);
+        const hint = add(card, "div", "?", "big");
+        const inp = add(card, "input"); inp.type = "number"; inp.inputMode = "numeric"; inp.placeholder = `1 ~ ${max}`;
+        const go = () => {
+          const v = Math.round(+inp.value);
+          if (!v) return;
+          left--;
+          if (v === ans) { hint.textContent = String(ans); return done(true, tries - left); }
+          if (left <= 0) { hint.textContent = `정답 ${ans}`; return mgLater(() => done(false, tries), 1000); }
+          hint.textContent = v < ans ? `${v} ⬆` : `${v} ⬇`;
+          info.textContent = (v < ans ? "더 큰 수예요" : "더 작은 수예요") + ` · 남은 기회 ${left}번`;
+          inp.value = ""; inp.focus();
+        };
+        mgBtn(card, "확인", true).onclick = go;
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+      },
+    };
+    const SCORE_TEXT = {
+      quiz: (s) => (s ? "정답!" : "오답"), timing: (s) => `${s}번 성공`, mash: (s) => `${s}번 눌렀어요`,
+      memory: (s) => `짝 ${s}개`, guess: (s, w) => (w ? `${s}번 만에 맞췄어요` : "기회를 다 썼어요"),
+    };
+
+    function minigame(cmd) {
+      stopSkip(); auto = false; syncButtons(); clearTimeout(autoTimer);
+      waitingTap = false;
+      el.box.hidden = true; el.choices.hidden = true;
+      const type = cmd.minigame;
+      if (!GAMES[type]) return showError(`모르는 미니게임 종류예요: "${type}"`);
+      const intro = {
+        quiz: "문제를 읽고 정답을 고르세요." + (cmd.time > 0 ? ` 제한 시간 ${cmd.time}초.` : ""),
+        timing: `움직이는 막대가 파란 칸 안에 있을 때 [지금!]을 누르세요. ${cmd.rounds || 3}번 중 ${Math.min(cmd.rounds || 3, cmd.need || 2)}번 성공하면 이겨요.`,
+        mash: `${cmd.time || 5}초 안에 버튼을 ${cmd.goal || 30}번 누르세요!`,
+        memory: "같은 그림 카드 두 장을 찾아 짝을 모두 맞추세요." + (cmd.time > 0 ? ` 제한 시간 ${cmd.time}초.` : ""),
+        guess: `1부터 ${cmd.max || 50} 사이의 숫자를 ${cmd.tries || 6}번 안에 맞추세요. 틀리면 더 큰지 작은지 알려줘요.`,
+      }[type];
+      mgClear();
+      el.mg.innerHTML = ""; el.mg.hidden = false;
+      const card = add(el.mg, "div", null, "vn-mg-card");
+      const title = cmd.title || MG_NAMES[type];
+      add(card, "h2", "🎮 " + title);
+      add(card, "p", intro);
+      mgBtn(card, "시작", true).onclick = () => {
+        card.innerHTML = "";
+        add(card, "h2", title);
+        let fin = false;
+        GAMES[type](card, cmd, (win, score) => { if (fin || dead) return; fin = true; mgFinish(card, cmd, win, score); });
+      };
+    }
+
+    function mgFinish(card, cmd, win, score) {
+      mgClear();
+      card.innerHTML = "";
+      add(card, "h2", win ? "🎉 성공!" : "실패…");
+      add(card, "p", SCORE_TEXT[cmd.minigame](score, win));
+      if (!win && cmd.retry) mgBtn(card, "다시 도전").onclick = () => minigame(cmd);
+      mgBtn(card, "계속", true).onclick = () => {
+        el.mg.hidden = true; el.mg.innerHTML = "";
+        if (cmd.score) S.vars[cmd.score] = score;
+        if (win && cmd.winSet) applySet(cmd.winSet);
+        if (!win && cmd.loseSet) applySet(cmd.loseSet);
+        S.log.push({ name: "🎮", text: `${cmd.title || MG_NAMES[cmd.minigame]} — ${win ? "성공" : "실패"}` });
+        const t = win ? cmd.win : cmd.lose;
+        if (t) jump(t); else run();
+      };
     }
 
     function flash(color, ms) {
@@ -404,6 +611,7 @@
       el.chars.innerHTML = "";
       el.bg.style.backgroundImage = ""; el.bg2.style.opacity = 0;
       el.cg.classList.remove("on");
+      mgClear(); el.mg.hidden = true; el.mg.innerHTML = "";
       if (state) {
         S = JSON.parse(JSON.stringify(state));
         S.index = S.lineIndex; S.log = S.log || [];
@@ -488,7 +696,7 @@
 
     // ---------- 입력 ----------
     el.stage.addEventListener("click", (e) => {
-      if (e.target.closest(".vn-menu, .vn-choices")) return;
+      if (e.target.closest(".vn-menu, .vn-choices, .vn-mg")) return;
       if (auto || skip) { auto = skip = false; syncButtons(); }
       advance();
     });
@@ -525,7 +733,7 @@
 
     return {
       destroy() {
-        dead = true; clearInterval(typing); timers.forEach(clearTimeout);
+        dead = true; mgClear(); clearInterval(typing); timers.forEach(clearTimeout);
         document.removeEventListener("keydown", onKey);
         if (ro) ro.disconnect();
         root.innerHTML = "";
