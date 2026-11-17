@@ -103,25 +103,25 @@
   .vn-gal-row.locked{opacity:.5}
   .vn-gal-count{font-size:13px;opacity:.7;margin:0}
   .vn-viewer{position:absolute;inset:0;z-index:25;background:#000 center/contain no-repeat;cursor:pointer}
-  .vn-mg{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,18,.72);cursor:default}
-  .vn-mg-card{width:min(520px,100%);max-height:100%;overflow:auto;background:#10162a;border:1px solid var(--vn-line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;text-align:center;animation:vn-pop .25s both}
-  .vn-mg h2{margin:0;font-family:"Gowun Batang",serif;font-size:22px}
-  .vn-mg p{margin:0;opacity:.85;font-size:15px;line-height:1.6;word-break:keep-all}
-  .vn-mg .vn-q{font-family:"Gowun Batang",serif;font-size:18px;opacity:1}
-  .vn-mg .big{font-size:42px;font-weight:700;font-variant-numeric:tabular-nums}
-  .vn-mg-btn{padding:14px;border-radius:12px;background:#182038;border:1px solid var(--vn-line);font-size:16px}
-  .vn-mg-btn:active{background:#24305a}
-  .vn-mg-btn.primary{background:var(--vn-accent);color:#0b1020;font-weight:700;border-color:var(--vn-accent)}
-  .vn-bar{position:relative;height:48px;border-radius:10px;background:#0b0f1d;border:1px solid var(--vn-line);overflow:hidden}
-  .vn-zone{position:absolute;top:0;bottom:0;background:rgba(143,211,255,.35);border-left:2px solid var(--vn-accent);border-right:2px solid var(--vn-accent)}
-  .vn-mark{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;background:#fff;box-shadow:0 0 10px #fff}
-  .vn-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .vn-card{aspect-ratio:3/4;border-radius:10px;background:#182038;border:1px solid var(--vn-line);font-size:28px;display:flex;align-items:center;justify-content:center;padding:0}
-  .vn-card.open{background:#f3f6ff;color:#000}.vn-card.done{opacity:.4}
-  .vn-mash{width:170px;height:170px;border-radius:50%;margin:0 auto;font-size:24px;font-weight:700;background:var(--vn-accent);color:#0b1020;border:0;user-select:none;-webkit-user-select:none}
-  .vn-mash:active{transform:scale(.94)}
-  .vn-mg input{padding:12px;font-size:20px;border-radius:10px;border:1px solid var(--vn-line);background:#0b0f1d;color:#fff;text-align:center;width:100%}
-  .vn-timer{height:6px;background:#0b0f1d;border-radius:3px;overflow:hidden}.vn-timer i{display:block;height:100%;width:100%;background:var(--vn-accent)}
+  .vn-mg{position:absolute;inset:0;z-index:5;background:#000;cursor:default;overflow:hidden}
+  .vn-pick-scroll{position:absolute;inset:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .vn-pick-art{position:absolute;background:center/100% 100% no-repeat}
+  .vn-pick-pan{position:absolute;z-index:2;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(10,14,26,.8);border:1px solid var(--vn-line);border-radius:999px;padding:6px 14px;font-size:13px;pointer-events:none;white-space:nowrap;animation:vn-pan 2.4s ease-in-out infinite}
+  @keyframes vn-pan{50%{transform:translateX(calc(-50% + 8px))}}
+  .vn-obj{position:absolute;transform:translate(-50%,-50%);padding:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .vn-obj img{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(255,255,255,.7));pointer-events:none}
+  .vn-obj .mk{width:100%;aspect-ratio:1;border-radius:50%;border:2px solid #fff;background:radial-gradient(circle,rgba(255,255,255,.6),rgba(143,211,255,.2) 55%,transparent 70%);box-shadow:0 0 12px rgba(255,255,255,.7);animation:vn-pulse 1.6s ease-in-out infinite}
+  @keyframes vn-pulse{50%{transform:scale(1.12);opacity:.75}}
+  .vn-obj.hid .mk,.vn-obj.hid img{opacity:0;animation:none;box-shadow:none}
+  .vn-obj .lb{margin-top:4px;font-size:12px;line-height:1.3;background:rgba(10,14,26,.8);border:1px solid var(--vn-line);padding:2px 8px;border-radius:999px;white-space:nowrap;pointer-events:none}
+  .vn-obj.picked{pointer-events:none}.vn-obj.picked .mk,.vn-obj.picked img{opacity:.3;animation:none}
+  .vn-obj.picked::after{content:"✔";position:absolute;top:0;right:-4px;font-size:18px;color:#8fffb0;text-shadow:0 0 4px #000}
+  .vn-pick-top{position:absolute;z-index:2;top:calc(8px + env(safe-area-inset-top,0px));left:8px;right:8px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;pointer-events:none}
+  .vn-pick-top>*{pointer-events:auto}
+  .vn-pick-ttl{background:rgba(10,14,26,.8);border:1px solid var(--vn-line);padding:8px 14px;border-radius:12px;font-size:14px;line-height:1.4}
+  .vn-pick-ttl b{display:block;font-size:15px}
+  .vn-pick-end{background:var(--vn-accent);color:#0b1020;border:0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;white-space:nowrap}
+  .vn-pick-msg{z-index:3;cursor:pointer}
   `;
 
   const HTML = `
@@ -454,7 +454,7 @@
     function setTint(t) { S.tint = t || ""; el.scene.dataset.tint = S.tint; el.tintfx.dataset.tint = S.tint; }
 
     // ---------- 입자 효과 (벚꽃 · 눈 · 반짝이 · 하트 · 비 · 빛 알갱이) ----------
-    const PFX_COLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff" };
+    const PFX_COLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff", steam: "#ffffff" };
     const pfx = { list: [], emit: null, raf: 0, last: 0, acc: 0, ctx: null, w: 0, h: 0, dpr: 1 };
     function pfxResize() {
       pfx.dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -471,7 +471,7 @@
         x: cmd.x == null ? 50 : +cmd.x, y: cmd.y == null ? 50 : +cmd.y,
         amount: Math.min(3, Math.max(1, +cmd.amount || 2)),
       };
-      if (c.mode === "burst") for (let i = 0; i < c.amount * 28; i++) spawn(c);
+      if (c.mode === "burst") for (let i = 0; i < c.amount * (c.shape === "steam" ? 10 : 28); i++) spawn(c);
       else { pfx.emit = c; if (S) S.pfx = cmd; }
       if (!pfx.raf) { pfx.last = performance.now(); pfx.raf = requestAnimationFrame(tick); }
     }
@@ -493,6 +493,17 @@
         p.max = burst ? 1.4 + Math.random() * 1.4 : 2.2 + Math.random() * 2.2;
         p.drag = burst ? 2.2 : 0.35;
         p.g = (c.shape === "sparkle" || c.shape === "dot" ? 8 : c.shape === "rain" ? 300 : 35) * u;
+      }
+      if (c.shape === "steam") {
+        // 수증기: 크고 흐릿한 덩어리가 위로 피어오르면서 커지고 옅어져요
+        p.size = (14 + Math.random() * 14) * u; p.grow = 1.2 + Math.random() * 1.2; p.fade = true; p.drag = 0.3; p.g = -6 * u;
+        if (c.mode === "fall") { p.x = Math.random() * W; p.y = H + 20; p.vx = (Math.random() - 0.5) * 16 * u; p.vy = -(25 + Math.random() * 35) * u; p.max = 4 + Math.random() * 3; }
+        else {
+          const a = -Math.PI / 2 + (Math.random() - 0.5) * (c.mode === "burst" ? 1.8 : 1.0);
+          const sp = (c.mode === "burst" ? 70 + Math.random() * 110 : 22 + Math.random() * 38) * u;
+          p.x += (Math.random() - 0.5) * 36 * u; p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+          p.max = c.mode === "burst" ? 1.8 + Math.random() * 1.2 : 2.4 + Math.random() * 1.8;
+        }
       }
       pfx.list.push(p);
     }
@@ -517,6 +528,12 @@
           for (let i = 0; i < 8; i++) { const r = i % 2 ? k * 0.22 : k; const an = (i * Math.PI) / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
           ctx.closePath(); ctx.fill(); break;
         }
+        case "steam": {
+          const r = s * (1 + (p.life / p.max) * p.grow);
+          const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+          gr.addColorStop(0, p.color); gr.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.globalAlpha = a * 0.2 * Math.min(1, p.life / 0.5); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.29); ctx.fill(); break;
+        }
         case "rain":
           ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-p.vx * 0.025, -p.vy * 0.025); ctx.stroke(); break;
         case "snow": case "dot": default: {
@@ -532,7 +549,7 @@
       const dt = Math.min(0.05, (now - pfx.last) / 1000); pfx.last = now;
       const e = pfx.emit;
       if (e) {
-        const rate = (e.mode === "fall" ? (e.shape === "rain" ? 70 : e.shape === "sparkle" || e.shape === "dot" ? 12 : 9) : 20) * e.amount;
+        const rate = (e.mode === "fall" ? (e.shape === "rain" ? 70 : e.shape === "sparkle" || e.shape === "dot" ? 12 : e.shape === "steam" ? 6 : 9) : e.shape === "steam" ? 5 : 20) * e.amount;
         pfx.acc += rate * dt;
         while (pfx.acc >= 1) { spawn(e); pfx.acc--; }
       }
@@ -630,174 +647,120 @@
       }
     }
 
-    // ---------- 미니게임 ----------
-    const MG_NAMES = { quiz: "퀴즈", timing: "타이밍 맞추기", mash: "연타하기", memory: "짝 맞추기", guess: "숫자 맞추기" };
-    let mgTimers = [], mgRaf = 0;
+    // ---------- 미니게임: 그림 속 오브젝트 고르기 ----------
+    // 일러스트 위에 오브젝트(선택지)를 놓고, 고르는 것에 따라 변수가 바뀌어요.
+    const ITEMS = P.items || {};
+    let mgTimers = [];
     const mgLater = (fn, ms) => mgTimers.push(later(fn, ms));
-    function mgClear() { mgTimers.forEach(clearTimeout); mgTimers = []; cancelAnimationFrame(mgRaf); }
+    let mgFit = null, mgRO = null;
+    function mgClear() { mgTimers.forEach(clearTimeout); mgTimers = []; if (mgFit) window.removeEventListener("resize", mgFit); mgFit = null; if (mgRO) mgRO.disconnect(); mgRO = null; }
     function add(parent, tag, text, cls) {
       const e = document.createElement(tag);
       if (text != null) e.textContent = text;
       if (cls) e.className = cls;
       parent.appendChild(e); return e;
     }
-    const mgBtn = (parent, text, primary) => add(parent, "button", text, "vn-mg-btn" + (primary ? " primary" : ""));
-    function timerBar(card, sec, onEnd) {
-      if (!(sec > 0)) return;
-      const bar = add(card, "div", null, "vn-timer"), fill = add(bar, "i");
-      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.transition = `width ${sec}s linear`; fill.style.width = "0%"; }));
-      mgLater(onEnd, sec * 1000);
-    }
-    const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-
-    const GAMES = {
-      quiz(card, c, done) {
-        add(card, "p", c.question || "문제", "vn-q");
-        timerBar(card, +c.time, () => done(false, 0));
-        (c.options || []).forEach((o, i) => { mgBtn(card, o).onclick = () => { const ok = i === (+c.answer || 0); done(ok, ok ? 1 : 0); }; });
-      },
-      timing(card, c, done) {
-        const rounds = +c.rounds || 3, need = Math.min(rounds, +c.need || 2), speed = Math.min(5, Math.max(1, +c.speed || 2));
-        const zw = 30 - speed * 4;
-        let round = 0, hits = 0, z0 = 0, t0 = 0, pos = 0, running = false;
-        const info = add(card, "p", "");
-        const bar = add(card, "div", null, "vn-bar"), zone = add(bar, "div", null, "vn-zone"), mark = add(bar, "div", null, "vn-mark");
-        const b = mgBtn(card, "지금!", true);
-        function next() {
-          if (hits >= need || hits + (rounds - round) < need) return done(hits >= need, hits);
-          info.textContent = `${round + 1} / ${rounds} 번째 · 성공 ${hits}번 (필요 ${need}번)`;
-          z0 = 8 + Math.random() * (84 - zw); zone.style.left = z0 + "%"; zone.style.width = zw + "%";
-          t0 = performance.now(); running = true; loop();
-        }
-        function loop() {
-          if (!running || dead) return;
-          const t = ((performance.now() - t0) / 1000) * speed * 0.55, ph = t % 2;
-          pos = (ph < 1 ? ph : 2 - ph) * 100; mark.style.left = pos + "%";
-          mgRaf = requestAnimationFrame(loop);
-        }
-        b.onclick = () => {
-          if (!running) return;
-          running = false; cancelAnimationFrame(mgRaf);
-          const hit = pos >= z0 && pos <= z0 + zw;
-          if (hit) hits++;
-          info.textContent = hit ? "✔ 성공!" : "✘ 빗나갔어요";
-          round++; mgLater(next, 700);
-        };
-        next();
-      },
-      mash(card, c, done) {
-        const T = +c.time || 5, goal = +c.goal || 30;
-        let n = 0, started = false, over = false;
-        const big = add(card, "div", "0", "big");
-        add(card, "p", `목표 ${goal}번 · ${T}초 (처음 누르는 순간 시작)`);
-        const bar = add(card, "div", null, "vn-timer"), fill = add(bar, "i");
-        const b = add(card, "button", "눌러!", "vn-mash");
-        b.addEventListener("pointerdown", (e) => {
-          e.preventDefault();
-          if (over) return;
-          if (!started) {
-            started = true;
-            requestAnimationFrame(() => { fill.style.transition = `width ${T}s linear`; fill.style.width = "0%"; });
-            mgLater(() => { over = true; done(n >= goal, n); }, T * 1000);
-          }
-          n++; big.textContent = n;
-        });
-      },
-      memory(card, c, done) {
-        const pairs = Math.min(8, Math.max(2, +c.pairs || 4));
-        const EM = ["🍓", "🌙", "⭐", "🎀", "🐱", "🌸", "🍀", "🎵"];
-        const deck = shuffle([...EM.slice(0, pairs), ...EM.slice(0, pairs)]);
-        let open = [], found = 0, moves = 0, lock = false;
-        const info = add(card, "p", "");
-        timerBar(card, +c.time, () => done(false, found));
-        const grid = add(card, "div", null, "vn-cards");
-        if (pairs <= 3) grid.style.gridTemplateColumns = "repeat(3,1fr)";
-        const upd = () => (info.textContent = `찾은 짝 ${found} / ${pairs} · 뒤집은 횟수 ${moves}`);
-        deck.forEach((em) => {
-          const d = add(grid, "button", "?", "vn-card");
-          d.onclick = () => {
-            if (lock || d.classList.contains("open")) return;
-            d.classList.add("open"); d.textContent = em; open.push([d, em]);
-            if (open.length === 2) {
-              moves++; lock = true;
-              const [a, b] = open;
-              if (a[1] === b[1]) {
-                a[0].classList.add("done"); b[0].classList.add("done"); found++; open = []; lock = false;
-                if (found === pairs) mgLater(() => done(true, found), 400);
-              } else mgLater(() => { [a, b].forEach(([x]) => { x.classList.remove("open"); x.textContent = "?"; }); open = []; lock = false; }, 700);
-            }
-            upd();
-          };
-        });
-        upd();
-      },
-      guess(card, c, done) {
-        const max = +c.max || 50, tries = +c.tries || 6, ans = 1 + Math.floor(Math.random() * max);
-        let left = tries;
-        const info = add(card, "p", `1 ~ ${max} · 남은 기회 ${left}번`);
-        const hint = add(card, "div", "?", "big");
-        const inp = add(card, "input"); inp.type = "number"; inp.inputMode = "numeric"; inp.placeholder = `1 ~ ${max}`;
-        const go = () => {
-          const v = Math.round(+inp.value);
-          if (!v) return;
-          left--;
-          if (v === ans) { hint.textContent = String(ans); return done(true, tries - left); }
-          if (left <= 0) { hint.textContent = `정답 ${ans}`; return mgLater(() => done(false, tries), 1000); }
-          hint.textContent = v < ans ? `${v} ⬆` : `${v} ⬇`;
-          info.textContent = (v < ans ? "더 큰 수예요" : "더 작은 수예요") + ` · 남은 기회 ${left}번`;
-          inp.value = ""; inp.focus();
-        };
-        mgBtn(card, "확인", true).onclick = go;
-        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
-      },
-    };
-    const SCORE_TEXT = {
-      quiz: (s) => (s ? "정답!" : "오답"), timing: (s) => `${s}번 성공`, mash: (s) => `${s}번 눌렀어요`,
-      memory: (s) => `짝 ${s}개`, guess: (s, w) => (w ? `${s}번 만에 맞췄어요` : "기회를 다 썼어요"),
-    };
 
     function minigame(cmd) {
+      if (cmd.minigame !== "pick") return showError(`이 미니게임 종류("${cmd.minigame}")는 더 이상 쓰지 않아요. 창작기에서 새 미니게임 블록으로 바꿔 주세요.`);
       stopSkip(); auto = false; syncButtons(); clearTimeout(autoTimer);
       waitingTap = false;
       el.box.hidden = true; el.choices.hidden = true;
-      const type = cmd.minigame;
-      if (!GAMES[type]) return showError(`모르는 미니게임 종류예요: "${type}"`);
-      const intro = {
-        quiz: "문제를 읽고 정답을 고르세요." + (cmd.time > 0 ? ` 제한 시간 ${cmd.time}초.` : ""),
-        timing: `움직이는 막대가 파란 칸 안에 있을 때 [지금!]을 누르세요. ${cmd.rounds || 3}번 중 ${Math.min(cmd.rounds || 3, cmd.need || 2)}번 성공하면 이겨요.`,
-        mash: `${cmd.time || 5}초 안에 버튼을 ${cmd.goal || 30}번 누르세요!`,
-        memory: "같은 그림 카드 두 장을 찾아 짝을 모두 맞추세요." + (cmd.time > 0 ? ` 제한 시간 ${cmd.time}초.` : ""),
-        guess: `1부터 ${cmd.max || 50} 사이의 숫자를 ${cmd.tries || 6}번 안에 맞추세요. 틀리면 더 큰지 작은지 알려줘요.`,
-      }[type];
       mgClear();
-      el.mg.innerHTML = ""; el.mg.hidden = false;
-      const card = add(el.mg, "div", null, "vn-mg-card");
-      const title = cmd.title || MG_NAMES[type];
-      add(card, "h2", "🎮 " + title);
-      add(card, "p", intro);
-      mgBtn(card, "시작", true).onclick = () => {
-        card.innerHTML = "";
-        add(card, "h2", title);
-        let fin = false;
-        GAMES[type](card, cmd, (win, score) => { if (fin || dead) return; fin = true; mgFinish(card, cmd, win, score); });
-      };
-    }
+      const M = el.mg; M.innerHTML = ""; M.hidden = false;
+      const objs = (cmd.objects || []).filter(Boolean);
+      const limit = Math.max(0, +cmd.picks || 0);
+      let picked = 0, busy = false;
 
-    function mgFinish(card, cmd, win, score) {
-      mgClear();
-      card.innerHTML = "";
-      add(card, "h2", win ? "🎉 성공!" : "실패…");
-      add(card, "p", SCORE_TEXT[cmd.minigame](score, win));
-      if (!win && cmd.retry) mgBtn(card, "다시 도전").onclick = () => minigame(cmd);
-      mgBtn(card, "계속", true).onclick = () => {
-        el.mg.hidden = true; el.mg.innerHTML = "";
-        if (cmd.score) S.vars[cmd.score] = score;
-        if (win && cmd.winSet) applySet(cmd.winSet);
-        if (!win && cmd.loseSet) applySet(cmd.loseSet);
-        S.log.push({ name: "🎮", text: `${cmd.title || MG_NAMES[cmd.minigame]} — ${win ? "성공" : "실패"}` });
-        const t = win ? cmd.win : cmd.lose;
-        if (t) jump(t); else run();
+      // 일러스트: 그림 비율을 지키면서 화면에 맞추고, 오브젝트는 그림 위 % 위치에 놓아요
+      const scroller = add(M, "div", null, "vn-pick-scroll");
+      const art = add(scroller, "div", null, "vn-pick-art");
+      const pan = add(M, "div", "← 옆으로 밀어서 둘러보세요 →", "vn-pick-pan"); pan.hidden = true;
+      const src = img(CGS[cmd.image] || BGS[cmd.image] || ITEMS[cmd.image] || cmd.image || "");
+      let ratio = 16 / 9;
+      // 세로 화면에서 가로로 긴 그림이 너무 작아지면, 화면 높이에 맞추고 옆으로 밀어서 보게 해요
+      let panned = false;
+      const fit = () => {
+        const W = M.clientWidth, H = M.clientHeight;
+        let w = W, h = W / ratio;
+        if (h > H) { h = H; w = H * ratio; }
+        const wide = h < H * 0.62;
+        if (wide) { h = H * 0.86; w = h * ratio; if (w <= W) { w = W; h = W / ratio; } }
+        Object.assign(art.style, { width: w + "px", height: h + "px", left: Math.max(0, (W - w) / 2) + "px", top: (H - h) / 2 + "px" });
+        const scrolls = w > W + 1;
+        pan.hidden = !scrolls || panned;
+        if (scrolls && !panned) scroller.scrollLeft = (w - W) / 2;
       };
+      scroller.addEventListener("scroll", () => { if (!pan.hidden && Math.abs(scroller.scrollLeft - (art.offsetWidth - M.clientWidth) / 2) > 20) { panned = true; pan.hidden = true; } }, { passive: true });
+      if (src) {
+        art.style.backgroundImage = `url("${src}")`;
+        const im = new Image();
+        im.onload = () => { if (im.naturalWidth) ratio = im.naturalWidth / im.naturalHeight; fit(); };
+        im.src = src;
+      }
+      fit(); mgFit = fit; window.addEventListener("resize", fit);
+      if (window.ResizeObserver) { mgRO = new ResizeObserver(fit); mgRO.observe(M); }
+
+      const top = add(M, "div", null, "vn-pick-top");
+      const ttl = add(top, "div", null, "vn-pick-ttl");
+      add(ttl, "b", cmd.title || "무엇을 고를까?");
+      const info = add(ttl, "span", "");
+      const endBtn = add(top, "button", "다 골랐어요", "vn-pick-end");
+      endBtn.hidden = limit > 0;
+      endBtn.onclick = (e) => { e.stopPropagation(); if (!busy) finish(); };
+      const upd = () => (info.textContent = limit ? `${limit}개 고를 수 있어요 · 남은 ${limit - picked}개` : (cmd.hint || "마음에 드는 것을 눌러 보세요"));
+      if (cmd.hint && limit) info.textContent = cmd.hint;
+      upd();
+
+      // 고른 뒤 보여줄 말풍선 (기존 대사 창 모양 그대로)
+      const msg = add(M, "div", null, "vn-box vn-pick-msg"); msg.hidden = true;
+      const mName = add(msg, "div", null, "vn-name"), mText = add(msg, "div", null, "vn-text");
+      add(msg, "div", "▼", "vn-next on");
+      let after = null;
+      msg.onclick = (e) => { e.stopPropagation(); msg.hidden = true; busy = false; const f = after; after = null; if (f) f(); };
+
+      objs.forEach((o) => {
+        const b = add(art, "button", null, "vn-obj" + (o.hidden ? " hid" : ""));
+        b.setAttribute("aria-label", o.name || "오브젝트");
+        b.style.left = (o.x == null ? 50 : o.x) + "%";
+        b.style.top = (o.y == null ? 50 : o.y) + "%";
+        b.style.width = (o.size || 12) + "%";
+        const isrc = o.item ? img(ITEMS[o.item] || o.item) : "";
+        if (isrc) { const i = add(b, "img"); i.src = isrc; i.alt = ""; } else add(b, "div", null, "mk");
+        if (cmd.labels && o.name && !o.hidden) add(b, "span", o.name, "lb");
+        b.onclick = (e) => {
+          e.stopPropagation();
+          if (busy || b.classList.contains("picked")) return;
+          if (o.once !== false) b.classList.add("picked");
+          if (o.hidden && cmd.labels && o.name) add(b, "span", o.name, "lb");
+          b.classList.remove("hid");
+          if (o.set) applySet(o.set);
+          picked++; upd();
+          S.log.push({ name: "🔍", text: o.name || "?" });
+          const next = () => {
+            if (o.goto) return finish(o.goto);
+            const left = objs.length - art.querySelectorAll(".vn-obj.picked").length;
+            if ((limit && picked >= limit) || (o.once !== false && left <= 0)) finish();
+          };
+          if (o.text) {
+            busy = true;
+            mName.textContent = o.say || o.name || ""; mName.hidden = !(o.say || o.name);
+            mName.style.color = colorFor(o.say || "");
+            mText.textContent = o.text;
+            msg.hidden = false; after = next;
+          } else next();
+        };
+      });
+      if (!objs.length) endBtn.hidden = false;
+
+      function finish(target) {
+        mgClear();
+        M.hidden = true; M.innerHTML = "";
+        S.log.push({ name: "🎮", text: `${cmd.title || "미니게임"} — ${picked}개 골랐어요` });
+        if (cmd.score) S.vars[cmd.score] = picked;
+        const t = target || cmd.goto;
+        if (t) jump(t); else run();
+      }
     }
 
     function flash(color, ms) {

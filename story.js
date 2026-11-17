@@ -15,10 +15,10 @@
    { if: "호감도 >= 2", goto: "좋은엔딩", else: "보통엔딩" } → 조건 분기
    { varImage: "charlotte", cases: [ { if: "호감도 >= 2", image: "smile" } ], else: "pout" }
                                         → 변수에 따라 다른 그림 (varImage: "bg" / "cg" / 캐릭터 코드 이름)
-   { minigame: "mash", time: 5, goal: 30, win: "성공장면", lose: "실패장면", winSet: { 호감도: +1 } }
-                                        → 미니게임 (quiz / timing / mash / memory / guess)
+   { minigame: "pick", image: "classroom", picks: 1, objects: [ { name: "사탕", x: 30, y: 60, text: "…", set: { 호감도: +1 } } ] }
+                                        → 미니게임: 그림 위 오브젝트를 골라 변수 바꾸기 (hidden: true 면 숨은 오브젝트)
    { particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 } → 입자 효과
-                                        (petal/snow/sparkle/heart/rain/dot · fall/spread/burst · { particles: "off" } 로 끄기)
+                                        (petal/snow/sparkle/heart/rain/dot/steam · fall/spread/burst · { particles: "off" } 로 끄기)
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
@@ -42,6 +42,9 @@ const PROJECT = {
 
   // 이벤트 그림(CG): 이름 → 이미지
   cgs: {},
+
+  // 오브젝트 그림 (미니게임에서 일러스트 위에 놓는 물건): 이름 → 이미지
+  items: {},
 
   // 캐릭터: 코드용 이름 → { 표시 이름, 이름 색, 표정들 }
   characters: {
@@ -102,8 +105,16 @@ const PROJECT = {
     공통: [
       "그때, 열린 창문으로 바람이 훅 불어 들어왔다.",
       { shake: true },
-      { say: "샬럿", face: "shy", text: "앗, 프린트가……!" },
-      { minigame: "mash", title: "날아가는 프린트 줍기", time: 5, goal: 25, winSet: { 호감도: +1 }, retry: true },
+      { say: "샬럿", face: "shy", text: "앗, 필통이……!" },
+      "샬럿의 물건이 교실 바닥에 흩어졌다. 하나를 주워 주자.",
+      { minigame: "pick", title: "흩어진 물건 줍기", image: "classroom", picks: 1, labels: true,
+        hint: "샬럿에게 하나를 주워 주자",
+        objects: [
+          { name: "머리핀", x: 28, y: 78, say: "샬럿", text: "아, 그거 찾고 있었어! ……고마워.", set: { 호감도: +1 } },
+          { name: "숙제 프린트", x: 55, y: 66, say: "샬럿", text: "……그건 그냥 숙제야." },
+          { name: "낙서 노트", x: 80, y: 80, say: "샬럿", text: "보, 보지 마!", set: { 호감도: -1 } },
+          { name: "고양이 스티커", x: 12, y: 45, size: 9, hidden: true, say: "샬럿", text: "그걸 어떻게 찾았어? 내 보물인데.", set: { 호감도: +2 } },
+        ] },
       { varImage: "charlotte", cases: [ { if: "호감도 >= 2", image: "smile" } ], else: "normal" },
       "샬럿: 있잖아. 내일 시간 있어?",
       { choice: [

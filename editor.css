@@ -197,3 +197,15 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 /* 입자 위치 고르기 */
 .pos-box { position: relative; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #1b2131 center / cover no-repeat; touch-action: none; cursor: crosshair; overflow: hidden; }
 .pos-dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.5), 0 0 14px #fff; pointer-events: none; }
+
+/* 미니게임 오브젝트 배치 */
+.obj-box { background-color: #000; }
+.obj-mark { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 1; border-radius: 50%; border: 2px solid #fff; background: rgba(143, 211, 255, .35) center / contain no-repeat;
+  box-shadow: 0 0 0 2px rgba(0,0,0,.45); pointer-events: none; display: flex; align-items: center; justify-content: center; min-width: 22px; }
+.obj-mark span { font: 700 12px/1 var(--f-ui); color: #fff; text-shadow: 0 0 3px #000; }
+.obj-mark.hid { border-style: dashed; background-color: rgba(255,255,255,.12); }
+.obj-mark.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent), 0 0 14px var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 7px 12px; font-size: 13px; }
+.chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.chip.add { border-style: dashed; color: var(--muted); background: transparent; }
