@@ -74,17 +74,64 @@
   .vn-toast{position:absolute;z-index:30;left:50%;top:20%;transform:translate(-50%,-10px);background:var(--vn-accent);color:#0b1020;padding:8px 18px;border-radius:999px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
   .vn-toast.on{opacity:1;transform:translate(-50%,0)}
   .vn-error{color:#ffb4b4}
-  .vn-hud{position:absolute;z-index:1;left:10px;top:calc(10px + env(safe-area-inset-top,0px));width:min(230px,48%);display:flex;flex-direction:column;gap:6px;pointer-events:none}
-  .vn-gauge{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:3px 8px;padding:6px 10px;border-radius:12px;background:rgba(10,14,26,.74);border:1px solid var(--vn-line);font-size:12px;animation:vn-pop .3s both}
-  .vn-gauge .ic{font-size:17px;grid-row:span 2;line-height:1}
+  .vn-hud{position:absolute;z-index:1;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:48%}
+  .vn-hud[data-pos="tl"]{left:10px;top:calc(10px + env(safe-area-inset-top,0px));align-items:flex-start}
+  .vn-hud[data-pos="tr"]{right:10px;top:56px;align-items:flex-end}
+  .vn-hud[data-pos="tc"]{left:50%;top:56px;transform:translateX(-50%);align-items:center}
+  .vn-gauge{--gc:#ff6b8b;--gs:1;position:relative;font-size:calc(12px * var(--gs));animation:vn-pop .3s both;color:#f3f6ff}
   .vn-gauge .lb{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .vn-gauge .val{font-variant-numeric:tabular-nums;opacity:.85}
-  .vn-gauge .bar{grid-column:2/4;height:8px;border-radius:4px;background:rgba(255,255,255,.14);overflow:hidden}
-  .vn-gauge .fill{height:100%;width:0;border-radius:4px;transition:width .7s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 8px currentColor}
+  .vn-gauge .val{font-variant-numeric:tabular-nums;opacity:.9}
+  .vn-gauge .ic{line-height:1}
   .vn-gauge.bump{animation:vn-bump .5s}
   @keyframes vn-bump{30%{transform:scale(1.07)}}
-  .vn-gauge .delta{position:absolute;right:10px;top:-6px;font-weight:700;font-size:14px;text-shadow:0 1px 3px #000;animation:vn-delta 1.2s forwards}
+  .vn-gauge .delta{position:absolute;right:6px;top:-8px;z-index:3;font-weight:800;font-size:calc(14px * var(--gs));text-shadow:0 1px 3px #000;animation:vn-delta 1.2s forwards}
   @keyframes vn-delta{to{transform:translateY(-18px);opacity:0}}
+  .vn-gauge .ticks{position:absolute;inset:0;pointer-events:none}
+  .vn-gauge .marks{position:absolute;inset:0;pointer-events:none}
+  .vn-gauge .mk{position:absolute;display:flex;align-items:center;justify-content:center;width:calc(20px * var(--gs));height:calc(20px * var(--gs));border-radius:50%;background:#fff;border:2px solid var(--mc,#ffd23f);color:var(--mc,#ffd23f);font-weight:900;font-size:calc(12px * var(--gs));box-shadow:0 1px 4px rgba(0,0,0,.45);transition:transform .3s}
+  .vn-gauge .mk.hit{background:var(--mc,#ffd23f);color:#fff;transform:scale(1.15)}
+  .vn-gauge .mk.ping{animation:vn-ping .6s}
+  @keyframes vn-ping{40%{transform:scale(1.6)}}
+  /* 가로 막대 */
+  .vn-gauge.g-bar{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:3px 8px;padding:6px 10px;border-radius:12px;background:rgba(10,14,26,.74);border:1px solid var(--vn-line);width:calc(220px * var(--gs))}
+  .g-bar .ic{font-size:calc(17px * var(--gs));grid-row:span 2}
+  .g-bar .track{grid-column:2/4;position:relative;height:calc(9px * var(--gs));border-radius:5px;background:rgba(255,255,255,.14);margin:2px 0 4px}
+  .g-bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:5px;background:var(--gc);box-shadow:0 0 8px var(--gc);transition:width .7s cubic-bezier(.2,.8,.2,1),background .5s}
+  .g-bar .ticks i{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.35)}
+  .g-bar .mk{top:50%;transform:translate(-50%,-50%);width:calc(16px * var(--gs));height:calc(16px * var(--gs));font-size:calc(10px * var(--gs))}
+  .g-bar .mk.hit{transform:translate(-50%,-50%) scale(1.15)}
+  /* 세로 통 (탱크) */
+  .vn-gauge.g-tank{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 8px 6px;border-radius:14px;background:linear-gradient(rgba(190,225,255,.55),rgba(150,200,240,.4));border:1px solid rgba(255,255,255,.5)}
+  .g-tank .big{font-size:calc(30px * var(--gs));font-weight:900;line-height:1;color:var(--pc,#ffe14d);-webkit-text-stroke:calc(1.5px * var(--gs)) rgba(120,80,0,.55);text-shadow:0 2px 0 rgba(0,0,0,.25);font-variant-numeric:tabular-nums}
+  .g-tank .tank{position:relative;width:calc(58px * var(--gs));height:calc(min(170px, 34vh) * var(--gs));border-radius:10px 10px 18px 18px;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.75);overflow:visible;box-shadow:inset 0 0 8px rgba(0,0,0,.15)}
+  .g-tank .fill{position:absolute;left:2px;right:2px;bottom:2px;height:0;border-radius:6px 6px 14px 14px;background:linear-gradient(90deg,color-mix(in srgb,var(--gc) 80%,#000),var(--gc) 45%,color-mix(in srgb,var(--gc) 75%,#fff));transition:height .8s cubic-bezier(.2,.8,.2,1),background .5s;overflow:hidden}
+  .g-tank .fill .wave{position:absolute;left:-50%;top:-5px;width:200%;height:10px;background:radial-gradient(circle at 10px -3px,transparent 9px,color-mix(in srgb,var(--gc) 85%,#fff) 10px) 0 0/20px 10px repeat-x;animation:vn-wave 2.4s linear infinite;opacity:.8}
+  @keyframes vn-wave{to{transform:translateX(20px)}}
+  .g-tank.over .fill{animation:vn-over 1s ease-in-out infinite}
+  @keyframes vn-over{50%{filter:brightness(1.3);box-shadow:0 0 14px var(--gc)}}
+  .g-tank .ticks i{position:absolute;left:0;width:22%;height:1px;background:rgba(0,0,0,.28)}
+  .g-tank .ticks i.r{left:auto;right:0}
+  .g-tank .mk{left:calc(-8px * var(--gs));transform:translateY(50%)}
+  .g-tank .mk.hit{transform:translateY(50%) scale(1.15)}
+  .g-tank .lb-row{display:flex;gap:4px;align-items:center;font-size:calc(12px * var(--gs));text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  /* 동그라미 */
+  .vn-gauge.g-ring{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .g-ring .ring{position:relative;width:calc(74px * var(--gs));height:calc(74px * var(--gs));border-radius:50%;background:conic-gradient(var(--gc) 0deg,rgba(255,255,255,.15) 0deg);box-shadow:0 2px 10px rgba(0,0,0,.4);transition:background .5s}
+  .g-ring .ring-in{position:absolute;inset:calc(8px * var(--gs));border-radius:50%;background:rgba(10,14,26,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  .g-ring .ic{font-size:calc(18px * var(--gs))}
+  .g-ring .val{font-weight:800;font-size:calc(13px * var(--gs))}
+  .g-ring .lb{background:rgba(10,14,26,.74);padding:2px 8px;border-radius:999px}
+  /* 아이콘 여러 개 · 칸 */
+  .vn-gauge.g-icons,.vn-gauge.g-cells{padding:6px 10px;border-radius:12px;background:rgba(10,14,26,.74);border:1px solid var(--vn-line)}
+  .g-icons .head,.g-cells .head{display:flex;justify-content:space-between;gap:10px;margin-bottom:4px}
+  .g-icons .units{display:flex;flex-wrap:wrap;gap:2px;max-width:calc(230px * var(--gs))}
+  .g-icons .u{position:relative;font-size:calc(20px * var(--gs));line-height:1}
+  .g-icons .u .base{opacity:.22;filter:grayscale(1)}
+  .g-icons .u .top{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;transition:width .5s}
+  .g-cells .units{display:flex;gap:3px;padding:3px;border:2px solid rgba(255,255,255,.55);border-radius:6px;position:relative}
+  .g-cells .units::after{content:"";position:absolute;right:calc(-7px * var(--gs));top:30%;bottom:30%;width:calc(4px * var(--gs));background:rgba(255,255,255,.55);border-radius:0 3px 3px 0}
+  .g-cells .u{width:calc(14px * var(--gs));height:calc(20px * var(--gs));border-radius:2px;background:rgba(255,255,255,.12);transition:background .4s,opacity .4s}
+  .g-cells .u.on{background:var(--gc);box-shadow:0 0 6px var(--gc)}
   .vn-root.vn-preview .vn-menu,.vn-root.vn-preview .vn-box,.vn-root.vn-preview .vn-title{display:none!important}
   .vn-scene{position:absolute;inset:0;transition:filter .8s}
   .vn-scene[data-tint="sepia"]{filter:sepia(.8) contrast(.95) brightness(1.02)}
@@ -148,7 +195,7 @@
     <div class="vn-choices" hidden></div>
     <div class="vn-mg" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
-    <div class="vn-hud"></div>
+    <div class="vn-hud" data-pos="tl"></div>
     <div class="vn-menu">
       <button class="vn-exit" data-a="exit" hidden>✕ 테스트 종료</button>
       <button data-a="auto">자동</button><button data-a="skip">스킵</button><button data-a="log">로그</button>
@@ -245,7 +292,9 @@
       R.classList.toggle("portrait", portrait);
       if (pfx.ctx) pfxResize();
       // 세로 화면에서는 메뉴가 두 줄이 되니 게이지를 메뉴 아래로 내려요
-      el.hud.style.top = portrait ? el.menu.offsetTop + el.menu.offsetHeight + 8 + "px" : "";
+      const below = el.menu.offsetTop + el.menu.offsetHeight + 8 + "px";
+      R.querySelectorAll('.vn-hud[data-pos="tl"]').forEach((h) => (h.style.top = portrait ? below : ""));
+      R.querySelectorAll('.vn-hud[data-pos="tr"], .vn-hud[data-pos="tc"]').forEach((h) => (h.style.top = below));
     }
     const ro = window.ResizeObserver ? new ResizeObserver(layout) : null;
     if (ro) ro.observe(R); else window.addEventListener("resize", layout);
@@ -477,6 +526,7 @@
     }
 
     // ---------- 📊 변수 게이지 ----------
+    // 모양: bar 가로 막대 · tank 세로 통 · ring 동그라미 · icons 아이콘 여러 개 · cells 배터리 칸
     let hudPrev = {};
     function showGauge(name, on) {
       S.hud = S.hud || [];
@@ -484,30 +534,104 @@
       for (const n of names) { S.hud = S.hud.filter((x) => x !== n); if (on) S.hud.push(n); }
       updateHud();
     }
+    function hudBox(pos) {
+      pos = { ml: "tl", mr: "tr" }[pos] || pos; // 예전 위치 이름도 받아요
+      pos = ["tl", "tr", "tc"].includes(pos) ? pos : "tl";
+      let b = R.querySelector(`.vn-hud[data-pos="${pos}"]`);
+      if (!b) { b = document.createElement("div"); b.className = "vn-hud"; b.dataset.pos = pos; el.stage.insertBefore(b, el.menu); layout(); }
+      return b;
+    }
+    const gMarks = (cfg) => (cfg.markers || []).filter((m) => m && m.at !== "" && m.at != null && !isNaN(+m.at)).slice().sort((a, b) => a.at - b.at);
+    function buildGauge(n, cfg) {
+      const st = cfg.style || "bar";
+      const g = document.createElement("div");
+      g.className = "vn-gauge g-" + st; g.dataset.v = n; g.dataset.sig = JSON.stringify(cfg);
+      g.style.setProperty("--gs", cfg.size || 1);
+      const min = +cfg.min || 0, max = cfg.max == null ? 10 : +cfg.max, span = (max - min) || 1;
+      if (st === "tank") g.innerHTML = '<div class="val big"></div><div class="tank"><div class="fill"><i class="wave"></i></div><div class="ticks"></div><div class="marks"></div></div><div class="lb-row"><span class="ic"></span><span class="lb"></span></div>';
+      else if (st === "ring") g.innerHTML = '<div class="ring"><div class="ring-in"><span class="ic"></span><span class="val"></span></div></div><span class="lb"></span>';
+      else if (st === "icons" || st === "cells") g.innerHTML = '<div class="head"><span><span class="ic"></span> <span class="lb"></span></span><span class="val"></span></div><div class="units"></div>';
+      else g.innerHTML = '<span class="ic"></span><span class="lb"></span><span class="val"></span><div class="track"><div class="fill"></div><div class="ticks"></div><div class="marks"></div></div>';
+      if (cfg.pctColor) g.style.setProperty("--pc", cfg.pctColor);
+      // 눈금
+      const ticks = g.querySelector(".ticks");
+      if (ticks && cfg.ticks) for (let i = 1; i < 10; i++) {
+        if (st === "tank") { ticks.insertAdjacentHTML("beforeend", `<i style="bottom:${i * 10}%"></i><i class="r" style="bottom:${i * 10}%"></i>`); }
+        else ticks.insertAdjacentHTML("beforeend", `<i style="left:${i * 10}%"></i>`);
+      }
+      // 표시점 (마커)
+      const marks = g.querySelector(".marks");
+      if (marks) gMarks(cfg).forEach((m, i) => {
+        const p = Math.max(0, Math.min(100, ((+m.at - min) / span) * 100));
+        const mk = document.createElement("span"); mk.className = "mk"; mk.dataset.i = i; mk.textContent = m.icon || "!";
+        mk.style.setProperty("--mc", m.color || "#ffd23f");
+        if (st === "tank") mk.style.bottom = p + "%"; else mk.style.left = p + "%";
+        marks.appendChild(mk);
+      });
+      // 아이콘 · 칸
+      const units = g.querySelector(".units");
+      if (units) {
+        const count = Math.max(1, Math.min(20, +cfg.cells || Math.min(10, Math.round(span))));
+        for (let i = 0; i < count; i++) {
+          const u = document.createElement("span"); u.className = "u";
+          if (st === "icons") { const ch = cfg.icon || "❤️"; u.innerHTML = `<span class="base"></span><span class="top"></span>`; u.firstChild.textContent = ch; u.lastChild.textContent = ch; }
+          units.appendChild(u);
+        }
+      }
+      if (st === "icons" || st === "cells") g.querySelector(".ic").textContent = st === "cells" ? cfg.icon || "" : "";
+      return g;
+    }
     function updateHud() {
       if (!S || dead) return;
       const want = Object.keys(GAUGES).filter((n) => GAUGES[n] && (GAUGES[n].always || (S.hud || []).includes(n)));
-      [...el.hud.children].forEach((g) => { if (!want.includes(g.dataset.v)) g.remove(); });
+      R.querySelectorAll(".vn-gauge").forEach((g) => { if (!want.includes(g.dataset.v) || g.dataset.sig !== JSON.stringify(GAUGES[g.dataset.v])) g.remove(); });
       want.forEach((n) => {
-        const cfg = GAUGES[n], v = +S.vars[n] || 0;
-        const min = +cfg.min || 0, max = cfg.max == null ? 10 : +cfg.max;
-        const pct = Math.max(0, Math.min(100, ((v - min) / ((max - min) || 1)) * 100));
-        let g = el.hud.querySelector(`[data-v="${window.CSS && CSS.escape ? CSS.escape(n) : n}"]`);
-        if (!g) {
-          g = document.createElement("div"); g.className = "vn-gauge"; g.dataset.v = n;
-          g.innerHTML = '<span class="ic"></span><span class="lb"></span><span class="val"></span><div class="bar"><div class="fill"></div></div>';
-          el.hud.appendChild(g);
-          // 처음에는 0 에서 차오르게
-          requestAnimationFrame(() => requestAnimationFrame(() => (g.querySelector(".fill").style.width = pct + "%")));
-        } else g.querySelector(".fill").style.width = pct + "%";
-        const color = cfg.color || "#ff6b8b";
-        g.querySelector(".ic").textContent = cfg.icon || "";
-        g.querySelector(".ic").hidden = !cfg.icon;
-        g.querySelector(".lb").textContent = cfg.label || n;
-        g.querySelector(".val").textContent = cfg.hideValue ? "" : `${v}${cfg.showMax === false ? "" : " / " + max}`;
-        const fill = g.querySelector(".fill"); fill.style.background = color; fill.style.color = color;
-        if (hudPrev[n] !== undefined && hudPrev[n] !== v) {
-          const d = v - hudPrev[n];
+        const cfg = GAUGES[n], v = +S.vars[n] || 0, st = cfg.style || "bar";
+        const min = +cfg.min || 0, max = cfg.max == null ? 10 : +cfg.max, span = (max - min) || 1;
+        const raw = ((v - min) / span) * 100;
+        const fillPct = Math.max(0, Math.min(100, raw));
+        const shown = cfg.overflow ? Math.max(0, raw) : fillPct;
+        let g = R.querySelector(`.vn-gauge[data-v="${window.CSS && CSS.escape ? CSS.escape(n) : n}"]`);
+        const fresh = !g;
+        if (fresh) { g = buildGauge(n, cfg); hudBox(cfg.pos).appendChild(g); }
+        // 표시점에 닿으면 게이지 색을 바꿀 수 있어요
+        const marks = gMarks(cfg);
+        let color = cfg.color || "#ff6b8b";
+        if (cfg.zoneColor) marks.forEach((m) => { if (v >= +m.at && m.color) color = m.color; });
+        g.style.setProperty("--gc", color);
+        g.querySelectorAll(".ic").forEach((e) => { if (st !== "icons" && st !== "cells") e.textContent = cfg.icon || ""; e.hidden = !e.textContent; });
+        g.querySelectorAll(".lb").forEach((e) => { e.textContent = cfg.label == null ? n : cfg.label; e.hidden = !e.textContent; });
+        const mode = cfg.show || (cfg.hideValue ? "none" : cfg.showMax === false ? "plain" : st === "tank" ? "percent" : "value");
+        const txt = mode === "percent" ? Math.round(shown) + "%" : mode === "value" ? `${v} / ${max}` : mode === "plain" ? String(v) : "";
+        g.querySelectorAll(".val").forEach((e) => { e.textContent = txt; e.hidden = !txt; });
+        const setFill = () => {
+          if (st === "bar") g.querySelector(".fill").style.width = fillPct + "%";
+          else if (st === "tank") { g.querySelector(".fill").style.height = `calc(${fillPct}% - 4px)`; g.classList.toggle("over", raw > 100); }
+          else if (st === "ring") g.querySelector(".ring").style.background = `conic-gradient(${color} ${fillPct * 3.6}deg, rgba(255,255,255,.15) 0deg)`;
+          else {
+            const us = [...g.querySelectorAll(".u")], per = 100 / us.length;
+            us.forEach((u, i) => {
+              const part = Math.max(0, Math.min(1, (fillPct - i * per) / per));
+              if (st === "icons") u.lastChild.style.width = part * 100 + "%";
+              else { u.classList.toggle("on", part > 0); u.style.opacity = part > 0 ? 0.45 + 0.55 * part : 1; }
+            });
+          }
+        };
+        if (fresh) requestAnimationFrame(() => requestAnimationFrame(setFill)); else setFill();
+        // 표시점: 닿았는지, 막 넘었는지
+        const prev = hudPrev[n];
+        g.querySelectorAll(".mk").forEach((mk) => {
+          const m = marks[+mk.dataset.i]; if (!m) return;
+          const hit = v >= +m.at;
+          mk.classList.toggle("hit", hit);
+          if (hit && prev !== undefined && prev < +m.at) {
+            mk.classList.remove("ping"); void mk.offsetWidth; mk.classList.add("ping");
+            if (m.fx === "shake") { el.stage.classList.remove("vn-shake"); void el.stage.offsetWidth; el.stage.classList.add("vn-shake"); }
+            if (m.fx === "flash") flash(m.color || "#ffffff", 500);
+          }
+        });
+        if (prev !== undefined && prev !== v) {
+          const d = v - prev;
           g.classList.remove("bump"); void g.offsetWidth; g.classList.add("bump");
           const pop = document.createElement("span"); pop.className = "delta"; pop.textContent = (d > 0 ? "+" : "") + d; pop.style.color = d > 0 ? color : "#9aa4c0";
           g.appendChild(pop); later(() => pop.remove(), 1200);
@@ -1108,7 +1232,7 @@
         S = fresh(scene);
         unlock("seen", S.scene);
       }
-      el.hud.innerHTML = ""; hudPrev = {};
+      R.querySelectorAll(".vn-gauge").forEach((g) => g.remove()); hudPrev = {};
       updateHud();
       run();
     }

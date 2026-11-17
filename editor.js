@@ -1739,38 +1739,97 @@
     });
   }
   // 📊 숫자 변수를 게이지로 보여주기
+  const G_STYLES = { bar: "▬ 가로 막대", tank: "▮ 세로 통 (탱크)", ring: "◯ 동그라미", icons: "★ 아이콘 여러 개", cells: "🔋 배터리 칸" };
+  const G_POS = { tl: "왼쪽 위", tc: "가운데 위", tr: "오른쪽 위" };
+  const G_SHOW = { value: "3 / 10", percent: "30%", plain: "3", none: "숫자 숨기기" };
+  const G_FX = { "": "효과 없음", shake: "화면 흔들기", flash: "화면 번쩍" };
+  function gPresets(g) {
+    const min = +g.min || 0, max = g.max == null ? 10 : +g.max, at = (r) => Math.round((min + (max - min) * r) * 10) / 10;
+    return {
+      "💗 하트 막대": { style: "bar", icon: "💗", color: "#ff6b8b", show: "value", ticks: false, markers: [], zoneColor: false, overflow: false },
+      "🧪 세로 통 + 경고": { style: "tank", icon: "", color: "#9c6b3c", show: "percent", pctColor: "#ffe14d", overflow: true, ticks: true, zoneColor: false,
+        markers: [{ at: at(0.95), icon: "!", color: "#ff3b3b", fx: "flash" }, { at: at(0.85), icon: "!", color: "#ff8a3d", fx: "shake" }, { at: at(0.7), icon: "!", color: "#ffd23f", fx: "" }] },
+      "⭕ 동그라미": { style: "ring", icon: "🔥", color: "#ff8a3d", show: "percent", markers: [], zoneColor: false },
+      "⭐ 별 다섯 개": { style: "icons", icon: "⭐", show: "value", cells: 5, markers: [] },
+      "🔋 배터리": { style: "cells", icon: "🔋", color: "#3bceac", show: "percent", cells: 5, markers: [{ at: at(0.2), icon: "!", color: "#ff3b3b" }], zoneColor: false },
+      "🚦 단계별 색": { style: "bar", icon: "🌡", color: "#3bceac", show: "value", ticks: true, zoneColor: true,
+        markers: [{ at: at(0.5), icon: "!", color: "#ffd23f" }, { at: at(0.8), icon: "!", color: "#ff3b3b", fx: "shake" }] },
+    };
+  }
   function gaugeEditor(name) {
-    const g = proj.gauges[name];
     const box = h("div", { class: "gauge-edit" });
-    const toggle = h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!g, onchange: (e) => {
-      if (e.target.checked) proj.gauges[name] = { label: name, icon: "💗", color: "#ff6b8b", min: 0, max: 10, always: true };
+    const toggle = h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!proj.gauges[name], onchange: (e) => {
+      if (e.target.checked) proj.gauges[name] = { label: name, icon: "💗", color: "#ff6b8b", min: 0, max: 10, always: true, style: "bar", pos: "tl", show: "value" };
       else delete proj.gauges[name];
       changed();
     } }), "📊 게임 화면에 게이지로 보여주기");
     box.append(toggle);
+    const g = proj.gauges[name];
     if (!g) return box;
-    const val = +proj.vars[name] || 0;
-    const fill = h("div", { class: "gp-fill" });
-    const prevLabel = h("b", {}), prevVal = h("span", {}), prevIc = h("span", { class: "gp-ic" });
-    const sync = () => {
-      const pct = Math.max(0, Math.min(100, ((val - (+g.min || 0)) / (((+g.max || 0) - (+g.min || 0)) || 1)) * 100));
-      fill.style.width = pct + "%"; fill.style.background = g.color; prevLabel.textContent = g.label || name; prevIc.textContent = g.icon || "";
-      prevVal.textContent = g.hideValue ? "" : `${val} / ${g.max}`;
+    const panel = h("div", { class: "gauge-panel" });
+    const pv = { v: +proj.vars[name] || 0 };
+    const stage = h("div", { class: "gauge-stage" });
+    let inst = null, timer = null;
+    // 실제 게임 엔진으로 게이지를 보여주는 미리보기
+    const preview = () => {
+      if (inst) inst.destroy();
+      if (!stage.isConnected || !proj.gauges[name]) return;
+      const bgName = Object.keys(proj.backgrounds)[0];
+      inst = VN.mount(stage, { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images, vars: { [name]: pv.v },
+        gauges: { [name]: Object.assign({}, proj.gauges[name], { always: true }) },
+        story: { a: [bgName ? { bg: bgName } : { wait: 1 }, { wait: 2000000000 }] } }, { startScene: "a", preview: true });
     };
-    const set = (k, v) => { g[k] = v; sync(); changed({ render: false }); };
-    put(box,
-      h("div", { class: "gauge-prev" }, prevIc, prevLabel, prevVal, h("div", { class: "gp-bar" }, fill)),
-      h("div", { class: "grid3" },
-        field("표시 이름", h("input", { type: "text", value: g.label || "", oninput: (e) => set("label", e.target.value) })),
-        field("아이콘", h("input", { type: "text", value: g.icon || "", maxlength: "4", placeholder: "💗", oninput: (e) => set("icon", e.target.value) })),
-        h("label", { class: "f" }, "색", h("input", { type: "color", value: g.color || "#ff6b8b", oninput: (e) => set("color", e.target.value) }))),
-      h("div", { class: "grid3" },
-        field("가장 작을 때 (빈 칸)", h("input", { type: "number", value: g.min == null ? 0 : g.min, oninput: (e) => set("min", +e.target.value || 0) })),
-        field("가장 클 때 (꽉 참)", h("input", { type: "number", value: g.max == null ? 10 : g.max, oninput: (e) => set("max", +e.target.value || 0) })),
-        field("보이기", h("select", { onchange: (e) => set("always", e.target.value === "always") },
-          h("option", { value: "always", selected: g.always !== false }, "항상"), h("option", { value: "block", selected: g.always === false }, "[게이지] 블록으로")))),
-      h("label", { class: "check" }, h("input", { type: "checkbox", checked: !g.hideValue, onchange: (e) => set("hideValue", !e.target.checked) }), "숫자도 보여주기 (예: 3 / 10)"));
-    sync();
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(preview, 200); };
+    const set = (k, v, redraw) => { g[k] = v; changed({ render: false }); if (redraw) draw(); refresh(); };
+    const DEF = () => ({ size: 1, style: "bar", pos: "tl", show: g.hideValue ? "none" : g.showMax === false ? "plain" : (g.style || "bar") === "tank" ? "percent" : "value" });
+    const sel = (k, opts, redraw) => h("select", { onchange: (e) => set(k, k === "size" ? +e.target.value : e.target.value, redraw) },
+      Object.entries(opts).map(([v, t]) => h("option", { value: v, selected: String(g[k] == null ? DEF()[k] : g[k]) === v }, t)));
+    const chk = (k, label, redraw) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!g[k], onchange: (e) => set(k, e.target.checked, redraw) }), label);
+    const draw = () => {
+      panel.innerHTML = "";
+      const st = g.style || "bar";
+      const min = +g.min || 0, max = g.max == null ? 10 : +g.max;
+      const pvTxt = h("span", {}, `미리보기 값: ${pv.v}`);
+      put(panel,
+        h("div", { class: "chips" }, Object.entries(gPresets(g)).map(([t, p]) => h("button", { class: "chip", onclick: () => { Object.assign(g, clone(p)); changed({ render: false }); draw(); refresh(); } }, t))),
+        h("div", { class: "gauge-stage-wrap" }, stage,
+          h("label", { class: "f" }, pvTxt, h("input", { type: "range", min: String(min), max: String(max + (g.overflow ? (max - min) * 0.2 : 0)), step: String((max - min) / 50 || 0.1), value: pv.v,
+            oninput: (e) => { pv.v = Math.round(+e.target.value * 10) / 10; pvTxt.textContent = `미리보기 값: ${pv.v}`; refresh(); } }))),
+        h("div", { class: "grid3" },
+          field("모양", sel("style", G_STYLES, true)),
+          field("위치", sel("pos", G_POS)),
+          field("크기", sel("size", { 0.8: "작게", 1: "보통", 1.3: "크게", 1.6: "아주 크게" }))),
+        h("div", { class: "grid3" },
+          field("표시 이름", h("input", { type: "text", value: g.label == null ? "" : g.label, placeholder: "비우면 이름 숨김", oninput: (e) => set("label", e.target.value) })),
+          field(st === "icons" ? "채울 아이콘" : "아이콘", h("input", { type: "text", value: g.icon || "", maxlength: "4", placeholder: st === "icons" ? "⭐" : "💗", oninput: (e) => set("icon", e.target.value) })),
+          st === "icons" ? null : h("label", { class: "f" }, "색", h("input", { type: "color", value: g.color || "#ff6b8b", oninput: (e) => set("color", e.target.value) }))),
+        h("div", { class: "grid3" },
+          field("빈 칸일 때 값", h("input", { type: "number", value: min, onchange: (e) => set("min", +e.target.value || 0, true) })),
+          field("꽉 찰 때 값", h("input", { type: "number", value: max, onchange: (e) => set("max", +e.target.value || 0, true) })),
+          field("숫자 표시", sel("show", G_SHOW))),
+        h("div", { class: "grid3" },
+          field("보이기", h("select", { onchange: (e) => set("always", e.target.value === "always") },
+            h("option", { value: "always", selected: g.always !== false }, "항상"), h("option", { value: "block", selected: g.always === false }, "[게이지] 블록으로"))),
+          st === "icons" || st === "cells" ? field("칸 개수", h("input", { type: "number", min: "1", max: "20", value: g.cells || Math.min(10, Math.round(max - min)) || 5, onchange: (e) => set("cells", Math.max(1, Math.min(20, +e.target.value || 5))) })) : null,
+          st === "tank" ? h("label", { class: "f" }, "% 글자 색", h("input", { type: "color", value: g.pctColor || "#ffe14d", oninput: (e) => set("pctColor", e.target.value) })) : null),
+        h("div", { class: "row" },
+          chk("overflow", "꽉 찬 뒤에도 숫자 올라가기 (예: 106%)"),
+          st === "bar" || st === "tank" ? chk("ticks", "눈금 보이기") : null,
+          st !== "icons" ? chk("zoneColor", "표시점에 닿으면 게이지 색 바꾸기") : null),
+        st === "icons" ? null : h("div", { class: "marker-list" },
+          h("b", {}, "표시점 (경고 · 목표 지점)"),
+          h("p", { class: "hint" }, "게이지 위의 특정 값에 아이콘을 붙여요. 값이 그 지점에 닿으면 아이콘이 반짝이고, 고른 효과가 나와요."),
+          (g.markers || []).map((m, j) => h("div", { class: "marker-row" },
+            field("값", h("input", { type: "number", value: m.at, onchange: (e) => { m.at = +e.target.value; set("markers", g.markers); } })),
+            field("아이콘", h("input", { type: "text", value: m.icon || "!", maxlength: "2", oninput: (e) => { m.icon = e.target.value; set("markers", g.markers); } })),
+            h("label", { class: "f" }, "색", h("input", { type: "color", value: m.color || "#ffd23f", oninput: (e) => { m.color = e.target.value; set("markers", g.markers); } })),
+            field("닿으면", h("select", { onchange: (e) => { m.fx = e.target.value; set("markers", g.markers); } }, Object.entries(G_FX).map(([v, t]) => h("option", { value: v, selected: (m.fx || "") === v }, t)))),
+            h("button", { class: "btn danger", style: { padding: "6px 10px", alignSelf: "flex-end" }, "aria-label": "표시점 빼기", onclick: () => { g.markers.splice(j, 1); set("markers", g.markers, true); } }, "✕"))),
+          h("button", { class: "btn dashed", onclick: () => { g.markers = g.markers || []; g.markers.push({ at: Math.round((min + (max - min) * 0.8) * 10) / 10, icon: "!", color: "#ffd23f", fx: "" }); set("markers", g.markers, true); } }, "+ 표시점 추가")));
+    };
+    draw();
+    box.append(panel);
+    setTimeout(preview, 80);
     return box;
   }
   function renderVars(w) {
