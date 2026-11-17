@@ -77,7 +77,6 @@
   let tab = "story";
   let scene = null;     // 지금 보는 장면
   let codeDirty = false;
-  let flashIdx = -1;
 
   function blankProject() {
     return {
@@ -165,6 +164,7 @@
   function kindOf(b) {
     if (typeof b === "string") return SAY_RE.test(b) ? "say" : "narr";
     if (!b || typeof b !== "object") return "raw";
+    if (isGroup(b)) return "group";
     if (b.minigame) return b.minigame === "pick" ? "minigame" : "raw"; // 예전 미니게임은 코드 블록으로 보여줘요
     if (b.particles !== undefined) return "particles";
     if (b.tint !== undefined) return "tint";
@@ -434,6 +434,19 @@
     return "// 💡 왼쪽 탭에서 만든 내용이 자동으로 이 코드가 돼요.\n// 여기서 직접 고치고 [코드 적용]을 눌러도 돼요.\n// \"img:...\" 는 올린 그림을 가리키는 이름표예요.\n\nconst PROJECT = " + toCode(p) + ";\n";
   }
 
+  // ---------- 묶음 도우미 ----------
+  // 묶음 = { group: "이름", blocks: [ ...블록들 ] }. 게임에서는 안의 블록들이 차례대로 실행돼요.
+  const isGroup = (b) => !!b && typeof b === "object" && !Array.isArray(b) && Array.isArray(b.blocks) && b.group !== undefined;
+  function walk(list, fn, label) {
+    list.forEach((b, i) => {
+      const lb = label ? `${label}-${i + 1}` : String(i + 1);
+      if (isGroup(b)) walk(b.blocks, fn, lb);
+      else fn(b, list, i, lb);
+    });
+  }
+  const flatList = (list) => list.flatMap((b) => (isGroup(b) ? flatList(b.blocks) : [b]));
+  const countBlocks = (b) => (isGroup(b) ? flatList(b.blocks).length : 1);
+
   // ---------- 검사 ----------
   function problems() {
     const out = [];
@@ -441,8 +454,8 @@
     const scn = (n) => S[n] !== undefined;
     if (!scn(proj.start)) out.push(`시작 장면 "${proj.start}" 이 없어요.`);
     for (const [name, list] of Object.entries(S)) {
-      list.forEach((b, i) => {
-        const at = `「${name}」 ${i + 1}번`;
+      walk(list, (b, l, i, lb) => {
+        const at = `「${name}」 ${lb}번`;
         const k = kindOf(b), f = toForm(b);
         if (k === "goto" && !scn(f.goto)) out.push(`${at}: 이동할 장면 "${f.goto}" 이 없어요.`);
         if (k === "if") { if (!scn(f.goto)) out.push(`${at}: 조건이 맞을 때 갈 장면 "${f.goto}" 이 없어요.`); if (f.else && !scn(f.else)) out.push(`${at}: 아닐 때 갈 장면 "${f.else}" 이 없어요.`); }
@@ -463,7 +476,8 @@
         if (k === "cg" && f.cg && !proj.cgs[f.cg]) out.push(`${at}: 이벤트 그림 "${f.cg}" 이 없어요.`);
         if ((k === "show" || k === "hide") && f.id !== "all" && !proj.characters[f.id]) out.push(`${at}: 캐릭터 "${f.id}" 이 없어요.`);
       });
-      const last = list[list.length - 1];
+      const flat = flatList(list);
+      const last = flat[flat.length - 1];
       const lk = last === undefined ? null : kindOf(last);
       const closed = lk === "goto" || lk === "end" || (lk === "choice" && toForm(last).options.every((o) => o.goto)) || (lk === "if" && toForm(last).else);
       if (!closed) out.push(`「${name}」 의 마지막에 장면 이동이나 엔딩이 없어요. (끝까지 가면 멈춰요)`);
@@ -484,10 +498,18 @@
   }
 
   // ===== 스토리 탭 =====
+  let selecting = false, selList = null, selIdx = new Set(); // 여러 개 선택
+  let clip = pref.get("clip", []);                          // 복사한 블록 (다른 장면·작품에도 붙여넣기 가능)
+  if (!Array.isArray(clip)) clip = [];
+  const openGroups = new WeakSet();                          // 펼쳐 둔 묶음
+  let flashKey = "";
+  function setClip(blocks) { clip = clone(blocks); pref.set("clip", clip); }
+  function stopSelecting() { selecting = false; selList = null; selIdx = new Set(); }
+
   function renderStory(w) {
     if (!proj.story[scene]) scene = proj.start in proj.story ? proj.start : Object.keys(proj.story)[0];
     const names = Object.keys(proj.story);
-    const sel = h("select", { "aria-label": "장면 고르기", onchange: (e) => { scene = e.target.value; render(); } },
+    const sel = h("select", { "aria-label": "장면 고르기", onchange: (e) => { scene = e.target.value; stopSelecting(); render(); } },
       names.map((n) => h("option", { value: n, selected: n === scene }, (n === proj.start ? "⭐ " : "") + n + (proj.memories.some((m) => m.scene === n) ? "  🎞" : ""))));
     w.append(
       h("div", { class: "scene-bar" }, sel),
@@ -495,53 +517,157 @@
         h("button", { class: "btn", onclick: () => sceneSheet(null) }, "+ 새 장면"),
         h("button", { class: "btn", onclick: () => sceneSheet(scene) }, "장면 설정 · 삭제"),
         scene === proj.start ? h("span", { class: "start-badge", style: { alignSelf: "center" } }, "⭐ 게임이 여기서 시작해요")
-          : h("button", { class: "btn", onclick: () => { proj.start = scene; changed(); toast(`"${scene}" 에서 시작해요`); } }, "⭐ 시작 장면으로")
+          : h("button", { class: "btn", onclick: () => { proj.start = scene; changed(); toast(`"${scene}" 에서 시작해요`); } }, "⭐ 시작 장면으로"),
+        h("button", { class: "btn" + (selecting ? " primary" : ""), onclick: () => { if (selecting) stopSelecting(); else selecting = true; render(); } },
+          selecting ? "✓ 선택 끝내기" : "☑ 여러 개 선택 (복사 · 묶기)")
       )
     );
     const list = proj.story[scene];
-    const ol = h("ol", { class: "blocks" });
-    list.forEach((b, i) => {
-      const k = kindOf(b);
-      const li = h("li", { class: `block k-${k}${i === flashIdx ? " flash" : ""}` },
-        h("div", { class: "stripe" }),
-        h("button", { class: "main", onclick: () => blockSheet(i), "aria-label": `${i + 1}번 블록 편집` },
-          h("span", { class: "kind" }, `${i + 1} · ${(KINDS[k] || { label: "코드" }).label}`),
-          h("div", { class: "sum" }, summary(b)),
-          h("code", {}, inlineCode(b))),
-        h("div", { class: "side" },
-          h("button", { "aria-label": "위로", onclick: () => move(i, -1), disabled: i === 0 }, "▲"),
-          h("button", { "aria-label": "아래로", onclick: () => move(i, 1), disabled: i === list.length - 1 }, "▼"))
-      );
-      ol.append(li);
-    });
-    flashIdx = -1;
-    w.append(ol);
+    if (selecting) w.append(h("p", { class: "hint" }, "블록을 눌러 고르세요. 묶음 안의 블록은 묶음을 펼친 뒤 고를 수 있어요."));
+    w.append(renderList(list, ""));
     if (!list.length) w.append(h("p", { class: "hint" }, "아직 비어 있어요. 아래 버튼으로 첫 블록을 넣어 보세요."));
-    w.append(h("button", { class: "btn primary wide", onclick: () => pickKind(list.length) }, "+ 블록 추가"));
+    if (!selecting) w.append(addRow(list, ""));
+    if (selecting) w.append(selectBar());
+    flashKey = "";
     const pr = problems();
     if (pr.length) w.append(h("div", { class: "warn" }, h("b", {}, `🔍 확인해 볼 곳 ${pr.length}개`), h("ul", {}, pr.slice(0, 8).map((p) => h("li", {}, p)))));
   }
 
-  function move(i, d) {
-    const l = proj.story[scene]; const j = i + d;
-    if (j < 0 || j >= l.length) return;
-    [l[i], l[j]] = [l[j], l[i]]; flashIdx = j; changed();
+  function renderList(list, prefix) {
+    const ol = h("ol", { class: "blocks" });
+    list.forEach((b, i) => {
+      const key = prefix ? `${prefix}/${i}` : String(i);
+      const label = prefix ? `${prefix.split("/").map((n) => +n + 1).join("-")}-${i + 1}` : String(i + 1);
+      const isSel = selecting && selList === list && selIdx.has(i);
+      const onMain = () => {
+        if (selecting) {
+          if (selList !== list) { selList = list; selIdx = new Set(); }
+          if (selIdx.has(i)) selIdx.delete(i); else selIdx.add(i);
+          render(); return;
+        }
+        if (isGroup(b)) groupSheet(list, i); else blockSheet(list, i);
+      };
+      const tick = selecting ? h("span", { class: "tick" }, isSel ? "☑" : "☐") : null;
+      const side = h("div", { class: "side" },
+        h("button", { "aria-label": "위로", onclick: () => move(list, i, -1, prefix), disabled: i === 0 }, "▲"),
+        h("button", { "aria-label": "아래로", onclick: () => move(list, i, 1, prefix), disabled: i === list.length - 1 }, "▼"));
+      if (isGroup(b)) {
+        const open = openGroups.has(b);
+        const card = h("div", { class: `block k-group${isSel ? " sel" : ""}${key === flashKey ? " flash" : ""}` },
+          h("div", { class: "stripe" }),
+          h("button", { class: "main", onclick: onMain, "aria-label": `${label}번 묶음` },
+            h("span", { class: "kind" }, tick, `${label} · 묶음`),
+            h("div", { class: "sum" }, `📦 ${b.group || "이름 없는 묶음"}`),
+            h("div", { class: "opt" }, `블록 ${countBlocks(b)}개`),
+            h("code", {}, `{ group: ${JSON.stringify(b.group)}, blocks: [ …${b.blocks.length}개 ] }`)),
+          side);
+        const toggle = h("button", { class: "group-toggle", onclick: () => { if (open) openGroups.delete(b); else openGroups.add(b); render(); } },
+          open ? "▾ 접기" : `▸ 펼쳐서 안의 블록 ${b.blocks.length}개 보기`);
+        ol.append(h("li", { class: "group-item" }, card, toggle,
+          open ? h("div", { class: "group-body" }, renderList(b.blocks, key), b.blocks.length ? null : h("p", { class: "hint" }, "비어 있는 묶음이에요."), selecting ? null : addRow(b.blocks, key)) : null));
+        return;
+      }
+      const k = kindOf(b);
+      ol.append(h("li", { class: `block k-${k}${isSel ? " sel" : ""}${key === flashKey ? " flash" : ""}` },
+        h("div", { class: "stripe" }),
+        h("button", { class: "main", onclick: onMain, "aria-label": `${label}번 블록 ${selecting ? "고르기" : "편집"}` },
+          h("span", { class: "kind" }, tick, `${label} · ${(KINDS[k] || { label: "코드" }).label}`),
+          h("div", { class: "sum" }, summary(b)),
+          h("code", {}, inlineCode(b))),
+        side));
+    });
+    return ol;
   }
 
-  function pickKind(at) {
+  function addRow(list, prefix) {
+    return h("div", { class: "add-row" },
+      h("button", { class: "btn primary", onclick: () => pickKind(list, list.length, prefix) }, prefix ? "+ 묶음 안에 블록 추가" : "+ 블록 추가"),
+      clip.length ? h("button", { class: "btn", onclick: () => paste(list, list.length, prefix) }, `📋 붙여넣기 (${clip.length})`) : null);
+  }
+
+  function paste(list, at, prefix) {
+    if (!clip.length) return toast("복사한 블록이 없어요");
+    const items = clone(clip);
+    list.splice(at, 0, ...items);
+    flashKey = prefix ? `${prefix}/${at}` : String(at);
+    stopSelecting(); closeSheet(); changed();
+    toast(`${items.length}개를 붙여넣었어요`);
+  }
+
+  function selectBar() {
+    const n = selIdx.size;
+    const idx = [...selIdx].sort((a, b) => a - b);
+    const picked = () => idx.map((i) => selList[i]);
+    const removeSel = () => { for (const i of [...idx].reverse()) selList.splice(i, 1); };
+    const need = (fn) => () => { if (!n) return toast("먼저 블록을 눌러 골라 주세요"); fn(); };
+    const del = h("button", { class: "btn danger", onclick: need(() => {
+      if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = `${n}개 정말 삭제`; return; }
+      removeSel(); stopSelecting(); changed(); toast(`${n}개를 삭제했어요`);
+    }) }, "🗑 삭제");
+    return h("div", { class: "select-bar" },
+      h("b", {}, n ? `${n}개 선택됨` : "블록을 눌러 고르세요"),
+      h("button", { class: "btn", onclick: () => { selList = proj.story[scene]; selIdx = new Set(selList.map((_, i) => i)); render(); } }, "전체 선택"),
+      h("button", { class: "btn primary", onclick: need(() => { setClip(picked()); stopSelecting(); render(); toast(`${n}개를 복사했어요. 원하는 곳에서 [붙여넣기]를 누르세요`); }) }, "📄 복사"),
+      h("button", { class: "btn", onclick: need(() => { setClip(picked()); removeSel(); stopSelecting(); changed(); toast(`${n}개를 잘라냈어요. 원하는 곳에서 [붙여넣기]를 누르세요`); }) }, "✂ 잘라내기"),
+      h("button", { class: "btn", onclick: need(() => {
+        let c = 1; walkGroups((g) => { const m = /^묶음 (\d+)$/.exec(g.group); if (m) c = Math.max(c, +m[1] + 1); });
+        const g = { group: `묶음 ${c}`, blocks: clone(picked()) };
+        const at = idx[0];
+        removeSel(); selList.splice(at, 0, g); openGroups.add(g);
+        stopSelecting(); changed(); toast("묶었어요. 묶음을 누르면 이름을 바꿀 수 있어요");
+      }) }, "📦 묶기"),
+      clip.length ? h("button", { class: "btn", onclick: need(() => paste(selList, idx[idx.length - 1] + 1, "")) }, `📋 아래에 붙여넣기 (${clip.length})`) : null,
+      del);
+  }
+  function walkGroups(fn) {
+    const go = (l) => l.forEach((b) => { if (isGroup(b)) { fn(b); go(b.blocks); } });
+    Object.values(proj.story).forEach(go);
+  }
+
+  // 묶음 편집: 이름 바꾸기 · 풀기 · 복사 · 삭제
+  function groupSheet(list, i) {
+    const g = list[i];
+    const nameIn = h("input", { type: "text", value: g.group, placeholder: "예: 1교시 쉬는 시간" });
+    const save = () => { g.group = nameIn.value.trim() || "묶음"; };
+    const del = h("button", { class: "btn danger", onclick: () => {
+      if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "안의 블록까지 정말 삭제"; return; }
+      list.splice(i, 1); closeSheet(); changed();
+    } }, "삭제");
+    openSheet("묶음", [
+      field("묶음 이름", nameIn),
+      h("p", { class: "hint" }, `블록 ${countBlocks(g)}개가 들어 있어요. 게임에서는 안의 블록이 위에서부터 차례대로 실행돼요. 묶음은 정리용이라 플레이에는 영향이 없어요.`),
+      h("code", { class: "hint", style: { whiteSpace: "pre-wrap", wordBreak: "break-all" } }, `코드: { group: ${JSON.stringify(g.group)}, blocks: [ ...블록 ${g.blocks.length}개 ] }`),
+    ], [
+      h("button", { class: "btn primary grow", onclick: () => { save(); closeSheet(); changed(); } }, "저장"),
+      h("button", { class: "btn", onclick: () => { save(); openGroups.add(g); closeSheet(); render(); pickKind(g.blocks, g.blocks.length, ""); } }, "+ 안에 블록 추가"),
+      h("button", { class: "btn", onclick: () => { save(); setClip([g]); closeSheet(); changed(); toast("묶음을 복사했어요"); } }, "📄 복사"),
+      h("button", { class: "btn", onclick: () => { save(); list.splice(i + 1, 0, clone(g)); closeSheet(); changed(); } }, "복제"),
+      h("button", { class: "btn", onclick: () => { list.splice(i, 1, ...g.blocks); closeSheet(); changed(); toast("묶음을 풀었어요"); } }, "📭 묶음 풀기"),
+      del]);
+  }
+
+  function move(list, i, d, prefix) {
+    const j = i + d;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    flashKey = prefix ? `${prefix}/${j}` : String(j);
+    stopSelecting(); changed();
+  }
+
+  function pickKind(list, at, prefix) {
     openSheet("어떤 블록을 넣을까요?", [
+      clip.length ? h("button", { class: "btn wide", onclick: () => paste(list, at, prefix) }, `📋 복사한 블록 붙여넣기 (${clip.length}개)`) : null,
       h("div", { class: "picker" }, Object.entries(KINDS).map(([k, d]) =>
-        h("button", { class: `k-${k}`, onclick: () => blockSheet(at, k) }, h("b", {}, d.label), h("span", {}, d.desc)))),
+        h("button", { class: `k-${k}`, onclick: () => blockSheet(list, at, k, prefix) }, h("b", {}, d.label), h("span", {}, d.desc)))),
     ]);
   }
 
   // ----- 블록 편집 창 -----
-  function blockSheet(i, newKind) {
-    const list = proj.story[scene];
+  function blockSheet(list, i, newKind, prefix) {
     const isNew = !!newKind;
     const k = newKind || kindOf(list[i]);
     const f = isNew ? defaultForm(k) : toForm(list[i]);
-    if (k === "raw") return rawSheet(i);
+    if (k === "raw") return rawSheet(list, i);
     const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
     const codeLine = h("code", { class: "hint", style: { whiteSpace: "pre-wrap", wordBreak: "break-all" } });
     let pvT;
@@ -551,11 +677,12 @@
     };
     const draw = () => { body.innerHTML = ""; put(body, formFor(k, f, draw, refreshCode)); refreshCode(); };
     draw();
+    const flashAt = (n) => (flashKey = prefix ? `${prefix}/${n}` : String(n));
     const commit = () => {
       if (k === "choice" && !f.options.length) return toast("선택지를 하나 이상 넣어 주세요");
       const b = fromForm(k, f);
       if (isNew) list.splice(i, 0, b); else list[i] = b;
-      flashIdx = i; closeSheet(); changed();
+      flashAt(i); closeSheet(); changed();
     };
     const foot = [h("button", { class: "btn primary grow", onclick: commit }, isNew ? "넣기" : "저장")];
     if (!isNew) {
@@ -564,8 +691,10 @@
         list.splice(i, 1); closeSheet(); changed();
       } }, "삭제");
       foot.push(
-        h("button", { class: "btn", onclick: () => { list.splice(i + 1, 0, clone(fromForm(k, f))); flashIdx = i + 1; closeSheet(); changed(); } }, "복제"),
-        h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); pickKind(i + 1); } }, "아래에 추가"),
+        h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); setClip([list[i]]); closeSheet(); changed(); toast("복사했어요. 원하는 곳에서 [붙여넣기]를 누르세요"); } }, "📄 복사"),
+        h("button", { class: "btn", onclick: () => { list.splice(i + 1, 0, clone(fromForm(k, f))); flashAt(i + 1); closeSheet(); changed(); } }, "복제"),
+        h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); pickKind(list, i + 1, prefix); } }, "아래에 추가"),
+        clip.length ? h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); paste(list, i + 1, prefix); } }, `📋 아래에 붙여넣기`) : null,
         del);
     }
     openSheet(`${isNew ? "새 " : ""}${KINDS[k].label}`, [body, codeLine], foot);
@@ -839,8 +968,7 @@
     return [];
   }
 
-  function rawSheet(i) {
-    const list = proj.story[scene];
+  function rawSheet(list, i) {
     const ta = h("textarea", { class: "code-edit", style: { minHeight: "30vh" }, value: toCode(list[i]) });
     const msg = h("div");
     openSheet("코드 블록", [h("p", { class: "hint" }, "창작기가 모르는 형식이라 코드로 보여 드려요."), ta, msg], [
@@ -867,7 +995,7 @@
       if (b.choice) b.choice.forEach((o) => { if (o.goto === from) o.goto = to; });
     });
   }
-  function eachBlock(fn) { for (const l of Object.values(proj.story)) l.forEach((b, i) => fn(b, l, i)); }
+  function eachBlock(fn) { for (const l of Object.values(proj.story)) walk(l, fn); } // 묶음 안의 블록까지
 
   function sceneSheet(name) {
     const isNew = name == null;
@@ -1291,7 +1419,9 @@
         '{ varImage: "charlotte",\n  cases: [ { if: "호감도 >= 3", image: "smile" } ],\n  else: "pout" }\n\n{ minigame: "pick", image: "교실", picks: 1, labels: true,\n  objects: [\n    { name: "사탕", x: 30, y: 60, text: "달콤해 보인다.", set: { 호감도: +1 } },\n    { name: "숙제", x: 70, y: 55, hidden: true, text: "숨겨진 숙제를 찾았다!" },\n  ],\n  goto: "다음장면" }'),
       L("8. 입자 효과 · 색감 · 회상방", "particles 는 입자 모양, mode 는 나오는 방식(fall 흩날리기 / spread 퍼지기 / burst 터지기), x·y 는 화면에서의 위치(%)예요. memories 에 넣은 장면은 회상방에서 다시 볼 수 있어요.",
         '{ particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 }\n{ particles: "off" }      // 끄기\n{ tint: "sepia" }         // 회상 색감\n{ tint: "" }              // 원래대로\n\nmemories: [ { scene: "좋은엔딩", title: "노을빛 약속" } ],'),
-      L("9. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("9. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
+        '{ group: "아침 인사", blocks: [\n  { bg: "classroom" },\n  "샬럿: 좋은 아침!",\n  "나: 안녕.",\n] },'),
+      L("10. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {

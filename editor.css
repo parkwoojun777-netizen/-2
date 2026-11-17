@@ -215,3 +215,19 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .pfx-box.nopick { cursor: default; }
 .pfx-stage { position: absolute; inset: 0; pointer-events: none; }
 .pfx-box .pos-dot { z-index: 5; }
+
+/* 묶음 · 여러 개 선택 */
+:root { --k-group: #0f9d8a; }
+.block.k-group { --kc: var(--k-group); }
+.block.k-group .sum { font-weight: 700; }
+.group-item { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.group-toggle { align-self: flex-start; background: none; border: 0; color: var(--accent); font-size: 13px; font-weight: 500; padding: 4px 6px; }
+.group-body { margin-left: 10px; padding-left: 10px; border-left: 2px dashed color-mix(in srgb, var(--k-group) 60%, var(--line)); display: flex; flex-direction: column; gap: 8px; }
+.block.sel { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--accent-soft); }
+.block .tick { font-size: 15px; margin-right: 6px; color: var(--accent); }
+.add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.add-row .btn { flex: 1; padding: 12px; min-width: 140px; }
+.select-bar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--surface);
+  border: 2px solid var(--accent); border-radius: 14px; padding: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .2); }
+.select-bar b { flex-basis: 100%; font-size: 14px; }
+.select-bar .btn { padding: 8px 11px; font-size: 13px; }

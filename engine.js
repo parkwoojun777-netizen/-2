@@ -195,7 +195,10 @@
       panel: q(".vn-panel"), panelTitle: q(".vn-panel-title"), panelBody: q(".vn-panel-body"), toastEl: q(".vn-toast"),
     };
 
-    const STORY = P.story || {};
+    // 묶음 { group, blocks: [...] } 은 안의 블록들을 차례대로 펼쳐서 실행해요
+    const flatten = (l) => (Array.isArray(l) ? l : []).flatMap((b) => (b && typeof b === "object" && !Array.isArray(b) && Array.isArray(b.blocks) && b.group !== undefined ? flatten(b.blocks) : [b]));
+    const STORY = {};
+    for (const [k, l] of Object.entries(P.story || {})) STORY[k] = flatten(l);
     const CHARS = P.characters || {};
     const BGS = P.backgrounds || {};
     const CGS = P.cgs || {};
