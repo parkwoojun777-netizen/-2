@@ -17,6 +17,9 @@
                                         → 변수에 따라 다른 그림 (varImage: "bg" / "cg" / 캐릭터 코드 이름)
    { minigame: "mash", time: 5, goal: 30, win: "성공장면", lose: "실패장면", winSet: { 호감도: +1 } }
                                         → 미니게임 (quiz / timing / mash / memory / guess)
+   { particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 } → 입자 효과
+                                        (petal/snow/sparkle/heart/rain/dot · fall/spread/burst · { particles: "off" } 로 끄기)
+   { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
    ===================================================================== */
@@ -54,6 +57,12 @@ const PROJECT = {
     },
   },
 
+  // 회상방에서 다시 볼 수 있는 장면
+  memories: [
+    { scene: "걱정", title: "너 혼자 있을 것 같아서" },
+    { scene: "좋은엔딩", title: "노을빛 약속" },
+  ],
+
   // 캐릭터가 아닌 이름의 색 (예: 주인공)
   nameColors: {
     나: "#ffd27a",
@@ -82,6 +91,7 @@ const PROJECT = {
       { goto: "공통" },
     ],
     걱정: [
+      { bg: "classroom" },
       "나: 왠지 네가 혼자 있을 것 같아서.",
       { show: "charlotte", face: "shy" },
       { shake: true },
@@ -109,14 +119,19 @@ const PROJECT = {
       { if: "호감도 >= 2", goto: "좋은엔딩", else: "보통엔딩" },
     ],
     좋은엔딩: [
+      { bg: "classroom" },
+      { tint: "sunset" },
       { say: "샬럿", face: "smile", text: "오늘…… 와 줘서 고마워." },
-      { flash: "white" },
+      { particles: "sparkle", mode: "burst", x: 50, y: 35 },
+      { particles: "petal", mode: "spread", x: 50, y: 35 },
       "그 윙크가, 오래도록 머릿속에서 떠나지 않았다.",
+      { particles: "off" },
       { end: "GOOD END — 노을빛 약속" },
     ],
     보통엔딩: [
       { say: "샬럿", face: "normal", text: "……뭐, 됐어. 먼저 갈게." },
       { hide: "charlotte" },
+      { tint: "gray" },
       "텅 빈 교실에 나 혼자 남았다.",
       { fade: "black" },
       { end: "NORMAL END — 빈 교실" },

@@ -74,6 +74,35 @@
   .vn-toast{position:absolute;z-index:30;left:50%;top:20%;transform:translate(-50%,-10px);background:var(--vn-accent);color:#0b1020;padding:8px 18px;border-radius:999px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
   .vn-toast.on{opacity:1;transform:translate(-50%,0)}
   .vn-error{color:#ffb4b4}
+  .vn-scene{position:absolute;inset:0;transition:filter .8s}
+  .vn-scene[data-tint="sepia"]{filter:sepia(.8) contrast(.95) brightness(1.02)}
+  .vn-scene[data-tint="gray"]{filter:grayscale(1) contrast(1.05)}
+  .vn-scene[data-tint="night"]{filter:brightness(.55) saturate(.7) hue-rotate(10deg)}
+  .vn-scene[data-tint="sunset"]{filter:saturate(1.25) sepia(.25) brightness(.97)}
+  .vn-scene[data-tint="dream"]{filter:blur(2px) brightness(1.1) saturate(1.1)}
+  .vn-tintfx{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .8s}
+  .vn-tintfx[data-tint="sepia"]{opacity:1;background:radial-gradient(ellipse at center,transparent 55%,rgba(60,35,10,.45))}
+  .vn-tintfx[data-tint="gray"]{opacity:1;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.35))}
+  .vn-tintfx[data-tint="night"]{opacity:1;background:rgba(25,45,130,.3)}
+  .vn-tintfx[data-tint="sunset"]{opacity:1;background:linear-gradient(rgba(255,140,60,.28),rgba(190,60,120,.2))}
+  .vn-tintfx[data-tint="dream"]{opacity:1;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,255,255,.5))}
+  .vn-pfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .vn-gallery{z-index:12;background:#0b0f1d;justify-content:flex-start;padding:calc(12px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+  .vn-gal-head{width:min(760px,100%);display:flex;justify-content:space-between;align-items:center}
+  .vn-gal-head h2{font-family:"Gowun Batang",serif;margin:0;font-size:24px}
+  .vn-gal-tabs{width:min(760px,100%);display:flex;gap:6px;margin:12px 0}
+  .vn-gal-tabs button{flex:1;padding:10px 4px;border-radius:10px;background:#182038;border:1px solid var(--vn-line);font-size:14px}
+  .vn-gal-tabs button.on{background:var(--vn-accent);color:#0b1020;font-weight:700}
+  .vn-gal-body{width:min(760px,100%);flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .vn-gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+  .vn-gal-cg{aspect-ratio:16/10;border-radius:10px;border:1px solid var(--vn-line);background:#182038 center/cover no-repeat;display:flex;align-items:flex-end;padding:0;overflow:hidden}
+  .vn-gal-cg span{width:100%;background:rgba(0,0,0,.6);font-size:12px;padding:4px 8px;text-align:left}
+  .vn-gal-cg.locked{align-items:center;justify-content:center;font-size:28px;color:#55608a}
+  .vn-gal-row{text-align:left;padding:14px;border-radius:10px;background:#182038;border:1px solid var(--vn-line);font-size:15px}
+  .vn-gal-row small{display:block;opacity:.6;font-size:12px;margin-top:2px}
+  .vn-gal-row.locked{opacity:.5}
+  .vn-gal-count{font-size:13px;opacity:.7;margin:0}
+  .vn-viewer{position:absolute;inset:0;z-index:25;background:#000 center/contain no-repeat;cursor:pointer}
   .vn-mg{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,18,.72);cursor:default}
   .vn-mg-card{width:min(520px,100%);max-height:100%;overflow:auto;background:#10162a;border:1px solid var(--vn-line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;text-align:center;animation:vn-pop .25s both}
   .vn-mg h2{margin:0;font-family:"Gowun Batang",serif;font-size:22px}
@@ -97,9 +126,13 @@
 
   const HTML = `
   <div class="vn-stage">
-    <div class="vn-bg"></div><div class="vn-bg vn-bg2"></div>
-    <div class="vn-chars"></div>
-    <div class="vn-cg"></div>
+    <div class="vn-scene">
+      <div class="vn-bg"></div><div class="vn-bg vn-bg2"></div>
+      <div class="vn-chars"></div>
+      <div class="vn-cg"></div>
+    </div>
+    <div class="vn-tintfx"></div>
+    <canvas class="vn-pfx"></canvas>
     <div class="vn-choices" hidden></div>
     <div class="vn-mg" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
@@ -114,6 +147,7 @@
     <div class="vn-title-bg"></div><h1></h1><div class="vn-title-sub"></div>
     <button class="vn-tbtn" data-a="start">처음부터</button>
     <button class="vn-tbtn" data-a="tload">이어하기</button>
+    <button class="vn-tbtn" data-a="gallery">회상방</button>
     <button class="vn-tbtn" data-a="tset">설정</button>
     <button class="vn-tbtn" data-a="exit" hidden>창작기로 돌아가기</button>
     <div class="vn-endings"></div>
@@ -125,6 +159,12 @@
       <div class="vn-panel-body"></div>
     </div>
   </div>
+  <div class="vn-overlay vn-gallery" hidden>
+    <div class="vn-gal-head"><h2>회상방</h2><button class="vn-panel-close" data-a="galclose" aria-label="닫기">✕</button></div>
+    <div class="vn-gal-tabs"><button data-g="cg">이벤트 그림</button><button data-g="scene">장면 다시 보기</button><button data-g="end">엔딩</button></div>
+    <div class="vn-gal-body"></div>
+  </div>
+  <div class="vn-viewer" hidden></div>
   <div class="vn-toast"></div>`;
 
   // 대사 문자열 "이름: 내용" 판별 (창작기도 같은 규칙을 씀)
@@ -148,7 +188,8 @@
     const q = (s) => R.querySelector(s);
     const el = {
       stage: q(".vn-stage"), bg: q(".vn-bg"), bg2: q(".vn-bg2"), chars: q(".vn-chars"),
-      cg: q(".vn-cg"), box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
+      cg: q(".vn-cg"), scene: q(".vn-scene"), tintfx: q(".vn-tintfx"), pfx: q(".vn-pfx"),
+      gallery: q(".vn-gallery"), galBody: q(".vn-gal-body"), viewer: q(".vn-viewer"), box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
       choices: q(".vn-choices"), mg: q(".vn-mg"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
       panel: q(".vn-panel"), panelTitle: q(".vn-panel-title"), panelBody: q(".vn-panel-body"), toastEl: q(".vn-toast"),
     };
@@ -161,6 +202,7 @@
     const SAVE_KEY = "vn_save_" + (P.title || "game");
     const SPEED_KEY = "vn_speed";
 
+    let replay = null; // 회상방에서 다시 보는 장면
     let S = null, typing = null, waitingTap = false, auto = false, skip = false, autoTimer = null, dead = false;
     let speed = load(SPEED_KEY, 28);
     const timers = new Set();
@@ -180,7 +222,7 @@
       return { scene: scene || P.start, index: 0, lineIndex: 0, vars: JSON.parse(JSON.stringify(P.vars || {})), bg: null, chars: {}, log: [] };
     }
 
-    function layout() { R.classList.toggle("portrait", R.clientHeight > R.clientWidth); }
+    function layout() { R.classList.toggle("portrait", R.clientHeight > R.clientWidth); if (pfx.ctx) pfxResize(); }
     const ro = window.ResizeObserver ? new ResizeObserver(layout) : null;
     if (ro) ro.observe(R); else window.addEventListener("resize", layout);
 
@@ -196,7 +238,15 @@
       requestAnimationFrame(() => requestAnimationFrame(() => { el.bg2.style.transition = "opacity .6s"; el.bg2.style.opacity = 0; }));
     }
 
+    function unlock(kind, name) {
+      if (!name) return;
+      const k = SAVE_KEY + "_" + kind, l = load(k, []);
+      if (!l.includes(name)) { l.push(name); store(k, l); }
+    }
+    const isOpen = (kind, name) => !!opts.unlockAll || load(SAVE_KEY + "_" + kind, []).includes(name);
+
     function setCg(name, fit) {
+      if (name && CGS[name]) unlock("cg", name);
       S.cg = name || ""; S.cgFit = fit || "";
       const src = name ? img(CGS[name] || name) : "";
       if (src) el.cg.style.backgroundImage = `url("${src}")`;
@@ -333,6 +383,8 @@
 
     function jump(scene) {
       if (!STORY[scene]) return showError(`장면 "${scene}" 을(를) 찾을 수 없어요.`);
+      if (replay && scene !== replay) return endReplay();
+      unlock("seen", scene);
       S.scene = scene; S.index = 0; run();
     }
 
@@ -376,6 +428,8 @@
         if (cmd.text !== undefined) { showLine("", cmd.text); return; }
         if (cmd.minigame) return minigame(cmd);
         if (cmd.varImage !== undefined) applyVarImage(cmd);
+        if (cmd.particles !== undefined) particles(cmd);
+        if (cmd.tint !== undefined) setTint(cmd.tint);
         if (cmd.bg) setBg(cmd.bg);
         if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {
@@ -394,6 +448,171 @@
         if (cmd.fade) { el.box.hidden = true; return fadeThrough(cmd.fade, () => { el.box.hidden = false; run(); }); }
         if (cmd.wait) { el.box.hidden = true; later(() => { el.box.hidden = false; run(); }, skip ? 0 : cmd.wait); return; }
       }
+    }
+
+    // ---------- 화면 색감 ----------
+    function setTint(t) { S.tint = t || ""; el.scene.dataset.tint = S.tint; el.tintfx.dataset.tint = S.tint; }
+
+    // ---------- 입자 효과 (벚꽃 · 눈 · 반짝이 · 하트 · 비 · 빛 알갱이) ----------
+    const PFX_COLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff" };
+    const pfx = { list: [], emit: null, raf: 0, last: 0, acc: 0, ctx: null, w: 0, h: 0, dpr: 1 };
+    function pfxResize() {
+      pfx.dpr = Math.min(2, window.devicePixelRatio || 1);
+      pfx.w = R.clientWidth || 1; pfx.h = R.clientHeight || 1;
+      el.pfx.width = Math.round(pfx.w * pfx.dpr); el.pfx.height = Math.round(pfx.h * pfx.dpr);
+      pfx.ctx = el.pfx.getContext("2d");
+    }
+    function particles(cmd) {
+      if (!cmd || !cmd.particles || cmd.particles === "off") { pfx.emit = null; if (S) S.pfx = null; return; }
+      pfxResize();
+      const c = {
+        shape: PFX_COLOR[cmd.particles] ? cmd.particles : "dot", mode: cmd.mode || "fall",
+        color: cmd.color || PFX_COLOR[cmd.particles] || "#ffffff",
+        x: cmd.x == null ? 50 : +cmd.x, y: cmd.y == null ? 50 : +cmd.y,
+        amount: Math.min(3, Math.max(1, +cmd.amount || 2)),
+      };
+      if (c.mode === "burst") for (let i = 0; i < c.amount * 28; i++) spawn(c);
+      else { pfx.emit = c; if (S) S.pfx = cmd; }
+      if (!pfx.raf) { pfx.last = performance.now(); pfx.raf = requestAnimationFrame(tick); }
+    }
+    function pfxStop() { pfx.emit = null; pfx.list = []; cancelAnimationFrame(pfx.raf); pfx.raf = 0; if (pfx.ctx) pfx.ctx.clearRect(0, 0, el.pfx.width, el.pfx.height); }
+    function spawn(c) {
+      const W = pfx.w, H = pfx.h, u = Math.max(0.7, Math.min(W, H) / 420);
+      const p = { shape: c.shape, color: c.color, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 3, sway: Math.random() * 6.28,
+        size: (5 + Math.random() * 6) * u * (c.shape === "snow" ? 0.55 : c.shape === "dot" ? 0.5 : 1), life: 0, g: 0, drag: 0, fade: true };
+      if (c.mode === "fall") {
+        p.x = Math.random() * W * 1.2 - W * 0.1; p.y = -20;
+        if (c.shape === "rain") { p.vx = -50 * u; p.vy = (650 + Math.random() * 300) * u; p.max = 3; }
+        else if (c.shape === "sparkle" || c.shape === "dot") { p.y = Math.random() * H; p.vx = (Math.random() - 0.5) * 20 * u; p.vy = -(10 + Math.random() * 25) * u; p.max = 2 + Math.random() * 2.5; }
+        else { p.vx = (Math.random() * 45 - 10) * u; p.vy = (35 + Math.random() * 45) * u; p.max = 40; p.fade = false; }
+      } else {
+        p.x = (W * c.x) / 100; p.y = (H * c.y) / 100;
+        const a = Math.random() * Math.PI * 2, burst = c.mode === "burst";
+        const sp = (burst ? 140 + Math.random() * 320 : 40 + Math.random() * 130) * u;
+        p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+        p.max = burst ? 1.4 + Math.random() * 1.4 : 2.2 + Math.random() * 2.2;
+        p.drag = burst ? 2.2 : 0.35;
+        p.g = (c.shape === "sparkle" || c.shape === "dot" ? 8 : c.shape === "rain" ? 300 : 35) * u;
+      }
+      pfx.list.push(p);
+    }
+    function drawP(ctx, p, a) {
+      const s = p.size;
+      ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
+      ctx.save(); ctx.translate(p.x, p.y);
+      switch (p.shape) {
+        case "petal":
+          ctx.rotate(p.rot); ctx.scale(1, 0.55 + 0.45 * Math.sin(p.sway * 1.6));
+          ctx.beginPath(); ctx.moveTo(0, -s);
+          ctx.quadraticCurveTo(s * 0.95, -s * 0.15, s * 0.15, s); ctx.lineTo(0, s * 0.75); ctx.lineTo(-s * 0.15, s);
+          ctx.quadraticCurveTo(-s * 0.95, -s * 0.15, 0, -s); ctx.fill(); break;
+        case "heart":
+          ctx.rotate(Math.sin(p.sway) * 0.4); ctx.scale(s / 10, s / 10);
+          ctx.beginPath(); ctx.moveTo(0, 3);
+          ctx.bezierCurveTo(-10, -4, -5, -11, 0, -5); ctx.bezierCurveTo(5, -11, 10, -4, 0, 3);
+          ctx.lineTo(0, 7); ctx.bezierCurveTo(0, 7, 0, 7, 0, 3); ctx.fill(); break;
+        case "sparkle": {
+          ctx.rotate(p.rot * 0.3); const k = s * (0.7 + 0.3 * Math.sin(p.life * 12));
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) { const r = i % 2 ? k * 0.22 : k; const an = (i * Math.PI) / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+          ctx.closePath(); ctx.fill(); break;
+        }
+        case "rain":
+          ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-p.vx * 0.025, -p.vy * 0.025); ctx.stroke(); break;
+        case "snow": case "dot": default: {
+          const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, s);
+          gr.addColorStop(0, p.color); gr.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, s, 0, 6.29); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    function tick(now) {
+      if (dead) return;
+      const dt = Math.min(0.05, (now - pfx.last) / 1000); pfx.last = now;
+      const e = pfx.emit;
+      if (e) {
+        const rate = (e.mode === "fall" ? (e.shape === "rain" ? 70 : e.shape === "sparkle" || e.shape === "dot" ? 12 : 9) : 20) * e.amount;
+        pfx.acc += rate * dt;
+        while (pfx.acc >= 1) { spawn(e); pfx.acc--; }
+      }
+      const ctx = pfx.ctx, W = pfx.w, H = pfx.h;
+      ctx.setTransform(pfx.dpr, 0, 0, pfx.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      pfx.list = pfx.list.filter((p) => {
+        p.life += dt;
+        if (p.drag) { const k = Math.exp(-p.drag * dt); p.vx *= k; p.vy *= k; }
+        p.vy += p.g * dt; p.sway += dt * 2.2; p.rot += p.vr * dt;
+        p.x += p.vx * dt + (p.shape === "petal" || p.shape === "snow" || p.shape === "heart" ? Math.sin(p.sway) * 0.5 : 0);
+        p.y += p.vy * dt;
+        if (p.life > p.max || p.y > H + 40 || p.x < -80 || p.x > W + 80) return false;
+        const fadeIn = Math.min(1, p.life / 0.15);
+        const a = (p.fade ? Math.max(0, 1 - p.life / p.max) : 0.9) * fadeIn;
+        drawP(ctx, p, a);
+        return true;
+      });
+      ctx.globalAlpha = 1;
+      if (!pfx.list.length && !pfx.emit) { pfx.raf = 0; ctx.clearRect(0, 0, W, H); return; }
+      pfx.raf = requestAnimationFrame(tick);
+    }
+
+    // ---------- 회상방 ----------
+    function endingNames() {
+      const out = [];
+      for (const l of Object.values(STORY)) (l || []).forEach((b) => { if (b && typeof b === "object" && b.end !== undefined && !out.includes(b.end || "THE END")) out.push(b.end || "THE END"); });
+      return out;
+    }
+    let galTabNow = "cg";
+    function openGallery(tab) {
+      el.gallery.hidden = false;
+      galTab(tab || galTabNow);
+    }
+    function galTab(t) {
+      galTabNow = t;
+      R.querySelectorAll(".vn-gal-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.g === t));
+      const B = el.galBody; B.innerHTML = "";
+      const count = (n, all) => add(B, "p", `${n} / ${all} 열림`, "vn-gal-count");
+      if (t === "cg") {
+        const names = Object.keys(CGS);
+        if (!names.length) return add(B, "p", "이 게임에는 이벤트 그림이 없어요.", "vn-gal-count");
+        count(names.filter((n) => isOpen("cg", n)).length, names.length);
+        const grid = add(B, "div", null, "vn-gal-grid");
+        names.forEach((n) => {
+          if (isOpen("cg", n)) {
+            const b = add(grid, "button", null, "vn-gal-cg");
+            b.style.backgroundImage = `url("${img(CGS[n])}")`;
+            add(b, "span", n);
+            b.onclick = () => { el.viewer.style.backgroundImage = `url("${img(CGS[n])}")`; el.viewer.hidden = false; };
+          } else add(grid, "div", "?", "vn-gal-cg locked");
+        });
+      } else if (t === "scene") {
+        const mem = (P.memories || []).filter((m) => STORY[m.scene]);
+        if (!mem.length) return add(B, "p", "다시 볼 수 있는 장면이 없어요.", "vn-gal-count");
+        count(mem.filter((m) => isOpen("seen", m.scene)).length, mem.length);
+        mem.forEach((m) => {
+          if (isOpen("seen", m.scene)) {
+            const b = add(B, "button", "▶ " + (m.title || m.scene), "vn-gal-row");
+            b.onclick = () => startReplay(m.scene);
+          } else { const d = add(B, "div", "??? ", "vn-gal-row locked"); add(d, "small", "아직 보지 못한 장면"); }
+        });
+      } else {
+        const names = endingNames();
+        if (!names.length) return add(B, "p", "엔딩이 없어요.", "vn-gal-count");
+        count(names.filter((n) => isOpen("endings", n)).length, names.length);
+        names.forEach((n) => {
+          const open = isOpen("endings", n);
+          add(B, "div", open ? "🏁 " + n : "??? ", "vn-gal-row" + (open ? "" : " locked"));
+        });
+      }
+    }
+    function startReplay(scene) {
+      el.gallery.hidden = true;
+      replay = scene;
+      startGame(null, scene);
+      toast("회상 중 · 장면이 끝나면 회상방으로 돌아가요");
+    }
+    function endReplay() {
+      toTitle();
+      openGallery("scene");
     }
 
     // ---------- 변수 그림: 변수 값에 따라 다른 그림 ----------
@@ -592,6 +811,7 @@
 
     // ---------- 엔딩 / 타이틀 ----------
     function showEnding(name) {
+      if (replay) return endReplay();
       stopSkip(); auto = false; syncButtons();
       q(".vn-ending-name").textContent = name || "THE END";
       el.ending.hidden = false;
@@ -600,6 +820,8 @@
     }
 
     function toTitle() {
+      replay = null; pfxStop();
+      el.scene.dataset.tint = ""; el.tintfx.dataset.tint = "";
       S = null; clearInterval(typing); clearTimeout(autoTimer); auto = skip = false; syncButtons();
       el.ending.hidden = true; el.panel.hidden = true; el.title.hidden = false;
       const seen = load(SAVE_KEY + "_endings", []);
@@ -612,15 +834,20 @@
       el.bg.style.backgroundImage = ""; el.bg2.style.opacity = 0;
       el.cg.classList.remove("on");
       mgClear(); el.mg.hidden = true; el.mg.innerHTML = "";
+      pfxStop(); el.scene.dataset.tint = ""; el.tintfx.dataset.tint = "";
+      if (!scene) replay = null;
       if (state) {
         S = JSON.parse(JSON.stringify(state));
         S.index = S.lineIndex; S.log = S.log || [];
         if (S.bg) setBg(S.bg, true);
         setCg(S.cg, S.cgFit);
+        setTint(S.tint);
+        if (S.pfx) particles(S.pfx);
         renderChars(true);
         S.log.pop();
       } else {
         S = fresh(scene);
+        unlock("seen", S.scene);
       }
       run();
     }
@@ -642,6 +869,7 @@
         b.onclick = () => {
           if (mode === "save") {
             if (!S) return;
+            if (replay) return toast("회상 중에는 저장할 수 없어요");
             const last = S.log[S.log.length - 1];
             data[i] = { state: S, preview: last ? (last.name ? last.name + ": " : "") + String(last.text).slice(0, 40) : S.scene, date: new Date().toLocaleString("ko-KR") };
             toast(store(SAVE_KEY, data) ? "저장했어요" : "저장하지 못했어요 (브라우저 저장소를 쓸 수 없어요)");
@@ -713,13 +941,17 @@
     const actions = {
       auto: toggleAuto, skip: toggleSkip, log: openLog, save: () => openSlots("save"), load: () => openSlots("load"),
       set: openSettings, tset: openSettings, tload: () => openSlots("load"), start: () => startGame(null),
-      totitle: toTitle, exit: () => opts.onExit && opts.onExit(),
+      totitle: toTitle, gallery: () => openGallery(), galclose: () => (el.gallery.hidden = true), exit: () => opts.onExit && opts.onExit(),
     };
     R.addEventListener("click", (e) => {
+      const g = e.target.closest("[data-g]");
+      if (g) { e.stopPropagation(); return galTab(g.dataset.g); }
       const b = e.target.closest("[data-a]");
       if (b && actions[b.dataset.a]) { e.stopPropagation(); actions[b.dataset.a](); }
     });
-    q(".vn-panel-close").onclick = () => (el.panel.hidden = true);
+    q(".vn-panel .vn-panel-close").onclick = () => (el.panel.hidden = true);
+    el.viewer.onclick = () => (el.viewer.hidden = true);
+    if (P.gallery === false) q('[data-a="gallery"]').hidden = true;
     if (opts.onExit) R.querySelectorAll('[data-a="exit"]').forEach((b) => (b.hidden = false));
 
     // ---------- 시작 ----------
@@ -729,11 +961,11 @@
     [...Object.values(BGS), ...Object.values(CGS), ...Object.values(CHARS).flatMap((c) => Object.values(c.faces || {}))]
       .forEach((ref) => { const i = new Image(); i.src = img(ref); });
     layout();
-    if (opts.startScene) startGame(null, opts.startScene); else toTitle();
+    if (opts.startScene) startGame(null, opts.startScene); else { toTitle(); if (opts.openGallery) openGallery(); }
 
     return {
       destroy() {
-        dead = true; mgClear(); clearInterval(typing); timers.forEach(clearTimeout);
+        dead = true; mgClear(); cancelAnimationFrame(pfx.raf); clearInterval(typing); timers.forEach(clearTimeout);
         document.removeEventListener("keydown", onKey);
         if (ro) ro.disconnect();
         root.innerHTML = "";

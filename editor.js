@@ -84,6 +84,7 @@
       title: "새 비주얼 노벨", subtitle: "", titleBg: "", start: "시작",
       vars: {}, backgrounds: {}, cgs: {}, characters: {}, nameColors: { 나: "#ffd27a" },
       story: { 시작: ["여기에 첫 문장을 써 보세요.", { end: "THE END" }] },
+      memories: [], gallery: true,
       images: {},
     };
   }
@@ -94,7 +95,8 @@
   }
   function normalize(p) {
     const b = blankProject();
-    for (const k of Object.keys(b)) if (p[k] == null) p[k] = k === "story" ? { 시작: [] } : b[k] && typeof b[k] === "object" ? {} : b[k];
+    for (const k of Object.keys(b)) if (p[k] == null) p[k] = k === "story" ? { 시작: [] } : clone(b[k]);
+    if (!Array.isArray(p.memories)) p.memories = [];
     if (!p.story[p.start]) p.start = Object.keys(p.story)[0] || "시작";
     if (!p.story[p.start]) p.story[p.start] = [];
     return p;
@@ -149,6 +151,8 @@
     if:     { label: "조건 분기",   desc: "변수에 따라 이동" },
     goto:   { label: "장면 이동",   desc: "다른 장면으로" },
     fx:     { label: "효과",        desc: "흔들기 · 번쩍 · 암전" },
+    particles: { label: "입자 효과", desc: "벚꽃·눈·반짝이·하트 (색 지정)" },
+    tint:   { label: "화면 색감",   desc: "회상·흑백·밤·노을·꿈" },
     wait:   { label: "잠깐 멈춤",   desc: "몇 초 쉬어요" },
     minigame: { label: "미니게임",  desc: "퀴즈·연타·타이밍·짝맞추기" },
     end:    { label: "엔딩",        desc: "게임을 끝내요" },
@@ -161,6 +165,8 @@
     if (typeof b === "string") return SAY_RE.test(b) ? "say" : "narr";
     if (!b || typeof b !== "object") return "raw";
     if (b.minigame) return "minigame";
+    if (b.particles !== undefined) return "particles";
+    if (b.tint !== undefined) return "tint";
     if (b.varImage !== undefined) return "varimg";
     if (b.choice) return "choice";
     if (b.say !== undefined) return "say";
@@ -213,6 +219,11 @@
   }
   const targetName = (t) => (t === "bg" ? "배경" : t === "cg" ? "이벤트 그림" : `${charName(t)} 표정`);
 
+  const PSHAPE = { petal: "🌸 벚꽃잎", snow: "❄ 눈", sparkle: "✨ 반짝이", heart: "💗 하트", rain: "🌧 비", dot: "● 빛 알갱이" };
+  const PCOLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff" };
+  const PMODE = { fall: "화면 전체에 흩날리기 (계속)", spread: "한 지점에서 퍼져 나오기 (계속)", burst: "한 지점에서 펑! 터지기 (한 번)" };
+  const TINTS = { "": "원래대로", sepia: "회상 (세피아)", gray: "흑백", night: "밤", sunset: "노을", dream: "꿈 (뿌옇게)" };
+
   function toForm(b) {
     const k = kindOf(b);
     switch (k) {
@@ -234,6 +245,9 @@
       case "wait": return { sec: (b.wait || 1000) / 1000 };
       case "fx": return { fx: b.shake ? "shake" : b.flash ? "flash:" + b.flash : "fade:" + b.fade };
       case "end": return { name: b.end };
+      case "particles": return b.particles === "off" ? { shape: "off", mode: "fall", color: PCOLOR.petal, x: 50, y: 40, amount: 2 }
+        : { shape: b.particles, mode: b.mode || "fall", color: b.color || PCOLOR[b.particles] || "#ffffff", x: b.x == null ? 50 : b.x, y: b.y == null ? 40 : b.y, amount: b.amount || 2 };
+      case "tint": return { tint: b.tint || "" };
       case "varimg": return {
         target: b.varImage, fit: b.fit || "contain",
         cases: (b.cases || []).map((x) => Object.assign(parseCond(x.if), { image: x.image == null ? "" : x.image })),
@@ -269,6 +283,16 @@
       case "wait": return { wait: Math.max(100, Math.round((+f.sec || 1) * 1000)) };
       case "fx": { const [a, c] = f.fx.split(":"); return a === "shake" ? { shake: true } : { [a]: c }; }
       case "end": return { end: f.name || "THE END" };
+      case "particles": {
+        if (f.shape === "off") return { particles: "off" };
+        const o = { particles: f.shape };
+        if (f.mode !== "fall") o.mode = f.mode;
+        if (f.color.toLowerCase() !== PCOLOR[f.shape]) o.color = f.color;
+        if (f.mode !== "fall") { o.x = Math.round(f.x); o.y = Math.round(f.y); }
+        if (+f.amount !== 2) o.amount = +f.amount;
+        return o;
+      }
+      case "tint": return { tint: f.tint };
       case "varimg": {
         const o = { varImage: f.target, cases: f.cases.filter((c) => c.var).map((c) => ({ if: `${c.var} ${c.op} ${c.val}`, image: c.image })) };
         if (f.else !== "__keep") o.else = f.else;
@@ -320,6 +344,8 @@
         return { target, fit: "contain", cases: [{ var: vars[0] || "", op: ">=", val: "1", image: first }], else: "__keep" };
       }
       case "minigame": return Object.assign(clone(MG_DEFAULT), { type: "quiz", wsVar: "", wsOp: "+", wsVal: "1" });
+      case "particles": return { shape: "petal", mode: "spread", color: PCOLOR.petal, x: 50, y: 40, amount: 2 };
+      case "tint": return { tint: "sepia" };
       case "choice": return { options: [{ text: "", goto: "", var: "", op: "+", val: "1", if: "" }, { text: "", goto: "", var: "", op: "+", val: "1", if: "" }] };
     }
   }
@@ -342,6 +368,10 @@
       case "wait": return `${f.sec}초 멈춤`;
       case "fx": return FX[f.fx] || f.fx;
       case "end": return `🏁 ${f.name}`;
+      case "particles": return f.shape === "off" ? "입자 효과 끄기" :
+        [h("span", { style: { display: "inline-block", width: "12px", height: "12px", borderRadius: "50%", background: f.color, marginRight: "6px", verticalAlign: "-1px", border: "1px solid var(--line)" } }),
+          `${PSHAPE[f.shape] || f.shape} · ${PMODE[f.mode].split(" (")[0]}${f.mode !== "fall" ? ` (${Math.round(f.x)}%, ${Math.round(f.y)}%)` : ""}`];
+      case "tint": return `🎨 ${TINTS[f.tint] || f.tint}`;
       case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기`),
         f.cases.map((c) => h("div", { class: "opt" }, `▸ ${c.var} ${c.op} ${c.val} 이면 → ${c.image || "숨기기"}`)),
         f.else !== "__keep" ? h("div", { class: "opt" }, `▸ 그 밖에는 → ${f.else || "숨기기"}`) : null];
@@ -431,12 +461,12 @@
     if (!proj.story[scene]) scene = proj.start in proj.story ? proj.start : Object.keys(proj.story)[0];
     const names = Object.keys(proj.story);
     const sel = h("select", { "aria-label": "장면 고르기", onchange: (e) => { scene = e.target.value; render(); } },
-      names.map((n) => h("option", { value: n, selected: n === scene }, (n === proj.start ? "⭐ " : "") + n)));
+      names.map((n) => h("option", { value: n, selected: n === scene }, (n === proj.start ? "⭐ " : "") + n + (proj.memories.some((m) => m.scene === n) ? "  🎞" : ""))));
     w.append(
       h("div", { class: "scene-bar" }, sel),
       h("div", { class: "scene-tools" },
         h("button", { class: "btn", onclick: () => sceneSheet(null) }, "+ 새 장면"),
-        h("button", { class: "btn", onclick: () => sceneSheet(scene) }, "이름 바꾸기 · 삭제"),
+        h("button", { class: "btn", onclick: () => sceneSheet(scene) }, "장면 설정 · 삭제"),
         scene === proj.start ? h("span", { class: "start-badge", style: { alignSelf: "center" } }, "⭐ 게임이 여기서 시작해요")
           : h("button", { class: "btn", onclick: () => { proj.start = scene; changed(); toast(`"${scene}" 에서 시작해요`); } }, "⭐ 시작 장면으로")
       )
@@ -599,6 +629,40 @@
       case "wait": return [field("몇 초?", inp("sec", { type: "number", min: "0.1", step: "0.5" }))];
       case "fx": return [field("효과", sel("fx", FX))];
       case "end": return [field("엔딩 이름", inp("name", { placeholder: "예: GOOD END — 약속" }))];
+      case "particles": {
+        const shapes = Object.assign({}, PSHAPE, { off: "⏹ 입자 효과 끄기" });
+        const parts = [field("모양", h("select", { onchange: (e) => { const old = f.shape; f.shape = e.target.value; if (PCOLOR[f.shape] && f.color.toLowerCase() === (PCOLOR[old] || "").toLowerCase()) f.color = PCOLOR[f.shape]; redraw(); } },
+          Object.entries(shapes).map(([v, t]) => h("option", { value: v, selected: v === f.shape }, t))))];
+        if (f.shape === "off") return [...parts, h("p", { class: "hint" }, "계속 나오던 입자를 멈춰요. 이미 나온 입자는 자연스럽게 사라져요.")];
+        parts.push(
+          field("나오는 방식", sel("mode", PMODE, true)),
+          h("div", { class: "row" },
+            h("label", { class: "f", style: { flex: "none" } }, "색", h("input", { type: "color", value: f.color, oninput: (e) => { f.color = e.target.value; upd(); dot && (dot.style.background = f.color); } })),
+            h("button", { class: "btn", style: { alignSelf: "flex-end" }, onclick: () => { f.color = PCOLOR[f.shape]; redraw(); } }, "기본 색"),
+            field("양", sel("amount", { 1: "적게", 2: "보통", 3: "많이" }))));
+        let dot = null;
+        if (f.mode !== "fall") {
+          // 터치로 위치 고르기: 화면 모양 상자를 누른 곳이 입자가 나오는 지점
+          dot = h("div", { class: "pos-dot", style: { left: f.x + "%", top: f.y + "%", background: f.color } });
+          const bgRef = proj.backgrounds[Object.keys(proj.backgrounds)[0]];
+          const box = h("div", { class: "pos-box", style: { backgroundImage: bgRef ? `url("${imgSrc(bgRef)}")` : "" } }, dot);
+          const setFrom = (ev) => {
+            const r = box.getBoundingClientRect();
+            f.x = Math.max(0, Math.min(100, ((ev.clientX - r.left) / r.width) * 100));
+            f.y = Math.max(0, Math.min(100, ((ev.clientY - r.top) / r.height) * 100));
+            dot.style.left = f.x + "%"; dot.style.top = f.y + "%"; posTxt.textContent = `가로 ${Math.round(f.x)}% · 세로 ${Math.round(f.y)}%`; upd();
+          };
+          box.addEventListener("pointerdown", (ev) => { box.setPointerCapture(ev.pointerId); setFrom(ev); });
+          box.addEventListener("pointermove", (ev) => { if (ev.buttons || ev.pointerType === "touch") setFrom(ev); });
+          const posTxt = h("span", { class: "hint" }, `가로 ${Math.round(f.x)}% · 세로 ${Math.round(f.y)}%`);
+          parts.push(h("label", { class: "f" }, "어디서 나올까요? (화면을 눌러 고르세요)", box, posTxt));
+          const presets = { "캐릭터 얼굴": [50, 35], "가운데": [50, 50], "위쪽": [50, 10], "왼쪽 위": [15, 15], "오른쪽 위": [85, 15], "아래쪽": [50, 85] };
+          parts.push(h("div", { class: "row" }, Object.entries(presets).map(([t, [x, y]]) => h("button", { class: "btn", style: { padding: "6px 10px", fontSize: "13px" }, onclick: () => { f.x = x; f.y = y; redraw(); } }, t))));
+        }
+        parts.push(h("p", { class: "hint" }, f.mode === "burst" ? "한 번 터지고 끝나요." : "끌 때까지 계속 나와요. 멈추려면 [입자 효과] 블록에서 '끄기'를 넣어 주세요."));
+        return parts;
+      }
+      case "tint": return [field("화면 색감", sel("tint", TINTS)), h("p", { class: "hint" }, "배경과 캐릭터의 색을 바꿔요. 대사 창은 그대로예요. 되돌리려면 '원래대로'를 넣어 주세요.")];
       case "varimg": {
         const targets = { bg: "배경", cg: "이벤트 그림" };
         Object.entries(proj.characters).forEach(([id, c]) => (targets[id] = `${c.name}의 표정`));
@@ -706,6 +770,7 @@
     for (const [n, l] of Object.entries(proj.story)) S[n === from ? to : n] = l;
     proj.story = S;
     if (proj.start === from) proj.start = to;
+    proj.memories.forEach((m) => { if (m.scene === from) m.scene = to; });
     eachBlock((b, l, i) => {
       if (typeof b !== "object" || !b) return;
       if (b.goto === from) b.goto = to;
@@ -732,13 +797,28 @@
       const del = h("button", { class: "btn danger", onclick: () => {
         if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = `"${name}" 정말 삭제`; return; }
         delete proj.story[name];
+        proj.memories = proj.memories.filter((m) => m.scene !== name);
         if (proj.start === name) proj.start = Object.keys(proj.story)[0];
         scene = proj.start; closeSheet(); changed();
       } }, "장면 삭제");
       foot.push(del);
     }
-    openSheet(isNew ? "새 장면" : "장면 이름", [field("장면 이름", inp), err,
-      isNew ? null : h("p", { class: "hint" }, "이름을 바꾸면 이 장면으로 가는 이동·선택지도 같이 바뀌어요.")], foot);
+    const mem = isNew ? null : proj.memories.find((m) => m.scene === name);
+    const memOn = h("input", { type: "checkbox", checked: !!mem });
+    const memTitle = h("input", { type: "text", value: mem ? mem.title || "" : "", placeholder: "회상방에 보일 제목 (예: 노을빛 약속)" });
+    foot[0].addEventListener("click", () => {
+      if (isNew || !$("#sheet-wrap").hidden) return; // 저장이 성공했을 때만
+      const sceneName = scene;
+      proj.memories = proj.memories.filter((m) => m.scene !== sceneName);
+      if (memOn.checked) proj.memories.push({ scene: sceneName, title: memTitle.value.trim() || sceneName });
+      changed();
+    });
+    openSheet(isNew ? "새 장면" : "장면 설정", [field("장면 이름", inp), err,
+      isNew ? null : h("p", { class: "hint" }, "이름을 바꾸면 이 장면으로 가는 이동·선택지도 같이 바뀌어요."),
+      isNew ? null : h("div", { class: "opt-card" },
+        h("label", { class: "check" }, memOn, "🎞 회상방에서 다시 보기에 넣기"),
+        memTitle,
+        h("p", { class: "hint" }, "플레이어가 이 장면을 한 번 본 뒤에 회상방에서 다시 볼 수 있어요. 다시 볼 때는 이 장면이 끝나거나 다른 장면으로 넘어가면 회상방으로 돌아가요. 장면 첫 블록에 배경을 넣어 두면 좋아요."))], foot);
     setTimeout(() => inp.focus(), 50);
   }
 
@@ -1110,7 +1190,9 @@
         'cgs: { 옥상_노을: "img:..." },\n\n{ cg: "옥상_노을" }   // 보여주기\n"샬럿: 예쁘다…"\n{ cg: "" }            // 숨기기'),
       L("7. 변수 그림과 미니게임", "varImage 는 cases 목록을 위에서부터 확인해서 처음 맞는 조건의 그림을 보여줘요. minigame 은 결과에 따라 win / lose 장면으로 가요.",
         '{ varImage: "charlotte",\n  cases: [ { if: "호감도 >= 3", image: "smile" } ],\n  else: "pout" }\n\n{ minigame: "mash", time: 5, goal: 30,\n  win: "성공장면", lose: "실패장면",\n  winSet: { 호감도: +1 } }'),
-      L("8. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("8. 입자 효과 · 색감 · 회상방", "particles 는 입자 모양, mode 는 나오는 방식(fall 흩날리기 / spread 퍼지기 / burst 터지기), x·y 는 화면에서의 위치(%)예요. memories 에 넣은 장면은 회상방에서 다시 볼 수 있어요.",
+        '{ particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 }\n{ particles: "off" }      // 끄기\n{ tint: "sepia" }         // 회상 색감\n{ tint: "" }              // 원래대로\n\nmemories: [ { scene: "좋은엔딩", title: "노을빛 약속" } ],'),
+      L("9. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {
@@ -1126,14 +1208,15 @@
       pr.length ? h("div", { class: "warn" }, h("b", {}, `확인해 볼 곳 ${pr.length}개`), h("ul", {}, pr.slice(0, 6).map((p) => h("li", {}, p)))) : h("p", { class: "hint" }, "✅ 눈에 띄는 문제는 없어요."),
       h("button", { class: "btn primary wide", onclick: () => play(null) }, "▶ 타이틀 화면부터"),
       h("button", { class: "btn wide", onclick: () => play(scene) }, `▶ 지금 장면 「${scene}」 부터`),
+      h("button", { class: "btn wide", onclick: () => play(null, { unlockAll: true, openGallery: true }) }, "🎞 회상방 미리보기 (전부 열린 상태)"),
       h("p", { class: "hint" }, "테스트 중 왼쪽 위 [✕ 테스트 종료] 를 누르면 돌아와요. 저장 슬롯은 실제 게임과 따로예요."),
     ]);
   }
-  function play(startScene) {
+  function play(startScene, extra) {
     closeSheet();
     const box = $("#player"); box.hidden = false;
     const P = clone(proj); P.title = (P.title || "") + " (테스트)";
-    playerInst = VN.mount(box, P, { startScene, onExit: stopPlay });
+    playerInst = VN.mount(box, P, Object.assign({ startScene, onExit: stopPlay }, extra));
   }
   function stopPlay() { if (playerInst) playerInst.destroy(); playerInst = null; $("#player").hidden = true; }
 
@@ -1148,6 +1231,8 @@
       h("h3", { class: "sec" }, "게임 정보"),
       h("div", { class: "grid2" }, field("게임 제목", t), field("부제", s)),
       field("타이틀 화면 배경", tb),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: proj.gallery !== false, onchange: (e) => { proj.gallery = e.target.checked; changed({ render: false }); } }),
+        "타이틀 화면에 [회상방] 버튼 보이기 (이벤트 그림 · 다시 볼 장면 · 엔딩 모음)"),
       h("h3", { class: "sec" }, "내 작품"),
       h("div", { class: "menu-list" },
         list.map((p) => h("button", { class: "btn" + (p.id === projId ? " cur" : ""), onclick: () => { if (p.id !== projId) openProject(p.id); closeSheet(); } },
