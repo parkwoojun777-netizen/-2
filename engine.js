@@ -222,8 +222,8 @@
       <div class="vn-bg"></div><div class="vn-bg vn-bg2"></div>
       <div class="vn-pics" data-layer="back"></div>
       <div class="vn-chars"></div>
-      <div class="vn-pics" data-layer="front"></div>
       <div class="vn-cg"></div><div class="vn-cg vn-cg2"></div>
+      <div class="vn-pics" data-layer="front"></div>
     </div>
     <div class="vn-tintfx"></div>
     <canvas class="vn-pfx"></canvas>
