@@ -9,10 +9,12 @@
   .vn-root{position:relative;width:100%;height:100%;overflow:hidden;background:#000;color:#f3f6ff;
     font-family:"Noto Sans KR",system-ui,sans-serif;user-select:none;-webkit-user-select:none;
     --vn-box:rgba(14,18,32,.84);--vn-line:rgba(160,200,255,.35);--vn-accent:#8fd3ff}
-  .vn-root *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  .vn-root *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
   .vn-root button{font:inherit;color:inherit;cursor:pointer}
   .vn-root [hidden]{display:none!important}
-  .vn-stage{position:absolute;inset:0;overflow:hidden}
+  .vn-stage{position:absolute;inset:0;overflow:hidden;cursor:pointer}
+  .vn-cg{position:absolute;inset:0;background:#000 center/contain no-repeat;opacity:0;transition:opacity .5s;pointer-events:none}
+  .vn-cg.cover{background-size:cover}.vn-cg.on{opacity:1}
   .vn-bg{position:absolute;inset:0;background:#111 center/cover no-repeat}
   .vn-bg2{opacity:0}
   .vn-chars{position:absolute;inset:0;pointer-events:none}
@@ -78,6 +80,7 @@
   <div class="vn-stage">
     <div class="vn-bg"></div><div class="vn-bg vn-bg2"></div>
     <div class="vn-chars"></div>
+    <div class="vn-cg"></div>
     <div class="vn-choices" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
     <div class="vn-menu">
@@ -125,7 +128,7 @@
     const q = (s) => R.querySelector(s);
     const el = {
       stage: q(".vn-stage"), bg: q(".vn-bg"), bg2: q(".vn-bg2"), chars: q(".vn-chars"),
-      box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
+      cg: q(".vn-cg"), box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
       choices: q(".vn-choices"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
       panel: q(".vn-panel"), panelTitle: q(".vn-panel-title"), panelBody: q(".vn-panel-body"), toastEl: q(".vn-toast"),
     };
@@ -133,6 +136,7 @@
     const STORY = P.story || {};
     const CHARS = P.characters || {};
     const BGS = P.backgrounds || {};
+    const CGS = P.cgs || {};
     const SLOTS = 6;
     const SAVE_KEY = "vn_save_" + (P.title || "game");
     const SPEED_KEY = "vn_speed";
@@ -170,6 +174,14 @@
       el.bg2.style.opacity = 1;
       el.bg.style.backgroundImage = src ? `url("${src}")` : "";
       requestAnimationFrame(() => requestAnimationFrame(() => { el.bg2.style.transition = "opacity .6s"; el.bg2.style.opacity = 0; }));
+    }
+
+    function setCg(name, fit) {
+      S.cg = name || ""; S.cgFit = fit || "";
+      const src = name ? img(CGS[name] || name) : "";
+      if (src) el.cg.style.backgroundImage = `url("${src}")`;
+      el.cg.classList.toggle("cover", fit === "cover");
+      el.cg.classList.toggle("on", !!src);
     }
 
     function renderChars(instant) {
@@ -343,6 +355,7 @@
         }
         if (cmd.text !== undefined) { showLine("", cmd.text); return; }
         if (cmd.bg) setBg(cmd.bg);
+        if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {
           const prev = S.chars[cmd.show] || {};
           S.chars[cmd.show] = { face: cmd.face || prev.face || "normal", pos: cmd.pos || prev.pos || "center" };
@@ -390,10 +403,12 @@
       el.title.hidden = true; el.ending.hidden = true; el.panel.hidden = true;
       el.chars.innerHTML = "";
       el.bg.style.backgroundImage = ""; el.bg2.style.opacity = 0;
+      el.cg.classList.remove("on");
       if (state) {
         S = JSON.parse(JSON.stringify(state));
         S.index = S.lineIndex; S.log = S.log || [];
         if (S.bg) setBg(S.bg, true);
+        setCg(S.cg, S.cgFit);
         renderChars(true);
         S.log.pop();
       } else {
@@ -503,7 +518,7 @@
     q(".vn-title h1").textContent = P.title || "제목 없음";
     q(".vn-title-sub").textContent = P.subtitle || "";
     if (P.titleBg) q(".vn-title-bg").style.backgroundImage = `url("${bgSrc(P.titleBg)}")`;
-    [...Object.values(BGS), ...Object.values(CHARS).flatMap((c) => Object.values(c.faces || {}))]
+    [...Object.values(BGS), ...Object.values(CGS), ...Object.values(CHARS).flatMap((c) => Object.values(c.faces || {}))]
       .forEach((ref) => { const i = new Image(); i.src = img(ref); });
     layout();
     if (opts.startScene) startGame(null, opts.startScene); else toTitle();

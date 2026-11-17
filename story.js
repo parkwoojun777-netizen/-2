@@ -8,6 +8,7 @@
    { say: "샬럿", face: "smile", text: "안녕?" } → 표정까지 바꾸면서 대사
    { bg: "classroom" }                  → 배경 바꾸기
    { show: "charlotte", face: "smile", pos: "left" } → 캐릭터 등장/표정 (pos: left/center/right)
+   { cg: "옥상_노을" }  /  { cg: "" }  → 이벤트 그림(CG) 화면 가득 보여주기 / 숨기기
    { hide: "charlotte" }  /  { hide: "all" } → 퇴장
    { choice: [ { text: "보기", goto: "장면", set: { 호감도: +1 } } ] } → 선택지
    { set: { 호감도: +1 } }  /  { set: { 이름: "=샬럿" } } → 변수 더하기 / 값 정하기
@@ -31,6 +32,9 @@ const PROJECT = {
   backgrounds: {
     classroom: "images/bg/classroom.jpg",
   },
+
+  // 이벤트 그림(CG): 이름 → 이미지
+  cgs: {},
 
   // 캐릭터: 코드용 이름 → { 표시 이름, 이름 색, 표정들 }
   characters: {

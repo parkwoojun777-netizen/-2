@@ -80,7 +80,7 @@
   function blankProject() {
     return {
       title: "새 비주얼 노벨", subtitle: "", titleBg: "", start: "시작",
-      vars: {}, backgrounds: {}, characters: {}, nameColors: { 나: "#ffd27a" },
+      vars: {}, backgrounds: {}, cgs: {}, characters: {}, nameColors: { 나: "#ffd27a" },
       story: { 시작: ["여기에 첫 문장을 써 보세요.", { end: "THE END" }] },
       images: {},
     };
@@ -126,6 +126,7 @@
     const used = new Set();
     const mark = (ref) => { if (typeof ref === "string" && ref.startsWith("img:")) used.add(ref.slice(4)); };
     Object.values(proj.backgrounds).forEach(mark);
+    Object.values(proj.cgs).forEach(mark);
     Object.values(proj.characters).forEach((c) => Object.values(c.faces || {}).forEach(mark));
     for (const id of Object.keys(proj.images)) if (!used.has(id)) delete proj.images[id];
   }
@@ -137,6 +138,7 @@
     say:    { label: "대사",        desc: "캐릭터가 말해요" },
     narr:   { label: "나레이션",    desc: "이름 없는 설명 글" },
     bg:     { label: "배경",        desc: "배경 그림을 바꿔요" },
+    cg:     { label: "이벤트 그림", desc: "그림을 화면 가득 보여줘요" },
     show:   { label: "캐릭터 등장", desc: "등장 / 표정 / 위치" },
     hide:   { label: "캐릭터 퇴장", desc: "화면에서 사라져요" },
     choice: { label: "선택지",      desc: "플레이어가 골라요" },
@@ -159,6 +161,7 @@
     if (b.text !== undefined) return "narr";
     if (b.if) return "if";
     if (b.end !== undefined) return "end";
+    if (b.cg !== undefined) return "cg";
     if (b.bg) return "bg";
     if (b.show) return "show";
     if (b.hide) return "hide";
@@ -192,6 +195,7 @@
       }
       case "narr": return { text: typeof b === "string" ? b : b.text };
       case "bg": return { bg: b.bg };
+      case "cg": return { cg: b.cg || "", fit: b.fit || "contain" };
       case "show": return { id: b.show, face: b.face || "", pos: b.pos || "center" };
       case "hide": return { id: b.hide };
       case "set": return parseSetEntry(b.set);
@@ -217,6 +221,7 @@
       }
       case "narr": return SAY_RE.test(f.text) ? { text: f.text } : f.text;
       case "bg": return { bg: f.bg };
+      case "cg": return !f.cg ? { cg: "" } : f.fit === "cover" ? { cg: f.cg, fit: "cover" } : { cg: f.cg };
       case "show": { const o = { show: f.id }; if (f.face) o.face = f.face; if (f.pos && f.pos !== "center") o.pos = f.pos; return o; }
       case "hide": return { hide: f.id };
       case "set": return { set: buildSet(f) || {} };
@@ -239,6 +244,7 @@
       case "say": return { name: firstChar ? proj.characters[firstChar].name : "나", text: "", face: "" };
       case "narr": return { text: "" };
       case "bg": return { bg: Object.keys(proj.backgrounds)[0] || "" };
+      case "cg": return { cg: Object.keys(proj.cgs)[0] || "", fit: "contain" };
       case "show": return { id: firstChar || "", face: firstChar ? Object.keys(proj.characters[firstChar].faces || {})[0] || "" : "", pos: "center" };
       case "hide": return { id: firstChar || "all" };
       case "set": return { var: vars[0] || "", op: "+", val: "1" };
@@ -260,6 +266,7 @@
       case "say": return [h("b", { style: { color: nameColor(f.name) } }, f.name), f.face ? `(${f.face}) ` : "", f.text];
       case "narr": return f.text;
       case "bg": return ["🖼 ", f.bg, proj.backgrounds[f.bg] ? "" : " ⚠ 없는 배경"];
+      case "cg": return f.cg ? ["🎞 ", f.cg, f.fit === "cover" ? " · 꽉 채우기" : "", proj.cgs[f.cg] ? "" : " ⚠ 없는 그림"] : "이벤트 그림 숨기기";
       case "show": return `${charName(f.id)} · ${f.face || "표정 그대로"} · ${POS[f.pos] || f.pos}`;
       case "hide": return `${charName(f.id)} 퇴장`;
       case "set": return setText(b.set);
@@ -318,6 +325,7 @@
         if (k === "if") { if (!scn(f.goto)) out.push(`${at}: 조건이 맞을 때 갈 장면 "${f.goto}" 이 없어요.`); if (f.else && !scn(f.else)) out.push(`${at}: 아닐 때 갈 장면 "${f.else}" 이 없어요.`); }
         if (k === "choice") f.options.forEach((o) => o.goto && !scn(o.goto) && out.push(`${at}: 선택지 "${o.text}" 의 장면 "${o.goto}" 이 없어요.`));
         if (k === "bg" && !proj.backgrounds[f.bg]) out.push(`${at}: 배경 "${f.bg}" 이 없어요.`);
+        if (k === "cg" && f.cg && !proj.cgs[f.cg]) out.push(`${at}: 이벤트 그림 "${f.cg}" 이 없어요.`);
         if ((k === "show" || k === "hide") && f.id !== "all" && !proj.characters[f.id]) out.push(`${at}: 캐릭터 "${f.id}" 이 없어요.`);
       });
       const last = list[list.length - 1];
@@ -465,8 +473,25 @@
       case "narr": return [field("나레이션", area("text", "장면 설명이나 속마음을 써 주세요"))];
       case "bg": {
         const opts = Object.fromEntries(Object.keys(proj.backgrounds).map((n) => [n, n]));
-        if (!Object.keys(opts).length) return [h("p", { class: "hint" }, "배경이 아직 없어요. [그림] 탭에서 배경을 올려 주세요.")];
-        return [field("배경", sel("bg", opts, true)), h("div", { class: "bg-preview", style: { backgroundImage: `url("${imgSrc(proj.backgrounds[f.bg])}")` } })];
+        const up = imageInput({ kind: "bg", label: "🖼 새 배경 그림 올리기" }, (ref, file) => {
+          const n = uniqueName(proj.backgrounds, fileBase(file, "배경"));
+          proj.backgrounds[n] = ref; if (!proj.titleBg) proj.titleBg = n;
+          f.bg = n; changed({ render: false }); redraw();
+        });
+        if (!Object.keys(opts).length) return [h("p", { class: "hint" }, "배경이 아직 없어요. 바로 올려 보세요."), up];
+        return [field("배경", sel("bg", opts, true)), h("div", { class: "bg-preview", style: { backgroundImage: `url("${imgSrc(proj.backgrounds[f.bg])}")` } }), up];
+      }
+      case "cg": {
+        const opts = { "": "— 숨기기 —" }; Object.keys(proj.cgs).forEach((n) => (opts[n] = n));
+        const up = imageInput({ kind: "cg", label: "🎞 새 이벤트 그림 올리기" }, (ref, file) => {
+          const n = uniqueName(proj.cgs, fileBase(file, "그림"));
+          proj.cgs[n] = ref; f.cg = n; changed({ render: false }); redraw();
+        });
+        return [
+          h("p", { class: "hint" }, "배경과 캐릭터 위에 그림 한 장을 크게 보여줘요. 다 보여준 뒤에는 [숨기기] 블록으로 치워 주세요."),
+          h("div", { class: "grid2" }, field("그림", sel("cg", opts, true)), field("맞추기", sel("fit", { contain: "그림 전체 보이기", cover: "화면 꽉 채우기" }, true))),
+          f.cg ? h("div", { class: "bg-preview", style: { backgroundImage: `url("${imgSrc(proj.cgs[f.cg])}")`, backgroundSize: f.fit === "cover" ? "cover" : "contain", backgroundColor: "#000" } }) : null,
+          up];
       }
       case "show": {
         if (!Object.keys(chars).length) return [h("p", { class: "hint" }, "캐릭터가 아직 없어요. [그림] 탭에서 캐릭터를 만들어 주세요.")];
@@ -578,6 +603,14 @@
         h("div", { class: "cap" }, h("b", {}, n), h("small", {}, `{ bg: "${n}" }`)))),
       h("button", { class: "thumb add", onclick: () => bgSheet(null) }, "+ 배경 추가")));
 
+    w.append(h("h3", { class: "sec" }, "이벤트 그림 (CG)"),
+      h("p", { class: "hint" }, "중요한 장면에서 화면 가득 보여줄 그림이에요. 스토리에서 [이벤트 그림] 블록으로 써요."));
+    w.append(h("div", { class: "thumbs" },
+      Object.entries(proj.cgs).map(([n, ref]) => h("button", { class: "thumb", onclick: () => bgSheet(n, "cgs") },
+        h("div", { class: "pic", style: { backgroundImage: `url("${imgSrc(ref)}")`, backgroundSize: "contain", backgroundColor: "#000" } }),
+        h("div", { class: "cap" }, h("b", {}, n), h("small", {}, `{ cg: "${n}" }`)))),
+      h("button", { class: "thumb add", onclick: () => bgSheet(null, "cgs") }, "+ 이벤트 그림 추가")));
+
     w.append(h("h3", { class: "sec" }, "캐릭터"),
       h("p", { class: "hint" }, "캐릭터 하나에 표정 그림을 여러 장 넣을 수 있어요. 흰 배경은 자동으로 지울 수 있어요."));
     w.append(h("div", { class: "thumbs" },
@@ -601,14 +634,44 @@
         })()));
   }
 
-  // 그림 파일 고르기 → 줄이기 (→ 흰 배경 지우기)
-  function pickImage() {
-    return new Promise((res) => {
-      const fi = $("#file-in");
-      fi.value = "";
-      fi.onchange = () => res(fi.files[0] || null);
-      fi.click();
-    });
+  // ---------- 그림 넣기 ----------
+  // 투명한 파일 입력칸을 버튼 위에 덮어서, 손가락이 바로 입력칸을 누르게 해요 (폰에서 가장 확실한 방법)
+  function fileButton(label, accept, onFile, cls) {
+    const input = h("input", { type: "file", accept, "aria-label": label, onchange: (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) onFile(f); } });
+    return h("label", { class: "btn filebtn " + (cls || "") }, h("span", {}, label), input);
+  }
+  // 그림 고르기 + 붙여넣기 + 진행 상태
+  function imageInput(opts, onRef) {
+    const status = h("div", { class: "img-status" });
+    const say = (t, bad) => { status.className = "img-status" + (bad ? " err" : ""); status.textContent = t; };
+    const handle = async (file) => {
+      if (!file) return;
+      if (file.type && !file.type.startsWith("image/")) return say("그림 파일이 아니에요.", true);
+      say("그림 처리 중…");
+      try {
+        const ref = addImage(await processImage(file, opts.kind, opts.white ? opts.white() : false));
+        say("✅ 넣었어요");
+        onRef(ref, file);
+      } catch (e) { say("그림을 읽지 못했어요. 다른 그림으로 해 보세요. (" + e.message + ")", true); }
+    };
+    const paste = h("textarea", { class: "paste", rows: 1, "aria-label": "그림 붙여넣기",
+      placeholder: "또는 그림을 복사한 뒤 여기를 길게 눌러 [붙여넣기]",
+      oninput: (e) => (e.target.value = ""),
+      onpaste: (e) => {
+        e.preventDefault(); e.target.value = ""; e.target.blur();
+        const it = [...((e.clipboardData && e.clipboardData.items) || [])].find((i) => i.kind === "file" && i.type.startsWith("image/"));
+        if (it) handle(it.getAsFile()); else say("붙여넣은 내용에 그림이 없어요. 그림 자체를 복사해 주세요.", true);
+      } });
+    return h("div", { class: "img-in" }, fileButton(opts.label || "🖼 사진첩에서 그림 고르기", "image/*", handle, "wide" + (opts.primary ? " primary" : "")), paste, status);
+  }
+  // 사진 파일 이름(IMG_1234 같은 것)은 의미가 없어서 "배경", "그림" 같은 이름을 대신 써요
+  function fileBase(file, fallback) {
+    const n = ((file && file.name) || "").replace(/\.[^.]+$/, "").replace(/[^\w가-힣]/g, "_").replace(/^_+|_+$/g, "").slice(0, 20);
+    return !n || /\d{3,}|image|img|photo|screenshot|스크린샷|사진/i.test(n) ? fallback : n;
+  }
+  function uniqueName(map, base) {
+    let n = base, i = 2; while (map[n]) n = base + i++;
+    return n;
   }
   function loadImg(file) {
     return new Promise((res, rej) => {
@@ -621,12 +684,12 @@
   }
   async function processImage(file, kind, removeWhite) {
     const im = await loadImg(file);
-    const max = kind === "bg" ? 1600 : 1400;
+    const max = kind === "sprite" ? 1400 : 1600;
     const sc = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
     let W = Math.round(im.naturalWidth * sc), H = Math.round(im.naturalHeight * sc);
     let cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     let cx = cv.getContext("2d"); cx.drawImage(im, 0, 0, W, H);
-    if (kind === "bg") return cv.toDataURL("image/jpeg", 0.86);
+    if (kind !== "sprite") return cv.toDataURL("image/jpeg", 0.86);
     if (removeWhite) {
       const d = cx.getImageData(0, 0, W, H), p = d.data;
       const white = (i) => p[i] >= 232 && p[i + 1] >= 232 && p[i + 2] >= 232;
@@ -663,43 +726,46 @@
   }
   function addImage(dataUrl) { const id = uid(); proj.images[id] = dataUrl; return "img:" + id; }
 
-  function bgSheet(name) {
+  // 배경 / 이벤트 그림 편집 (map: "backgrounds" 또는 "cgs")
+  function bgSheet(name, map) {
+    map = map || "backgrounds";
+    const isBg = map === "backgrounds";
+    const M = proj[map];
     const isNew = name == null;
-    const st = { name: isNew ? "" : name, ref: isNew ? "" : proj.backgrounds[name] };
-    const prev = h("div", { class: "bg-preview" });
-    const showPrev = () => { prev.style.backgroundImage = st.ref ? `url("${imgSrc(st.ref)}")` : ""; prev.textContent = st.ref ? "" : ""; };
+    const st = { ref: isNew ? "" : M[name] };
+    const prev = h("div", { class: "bg-preview", style: isBg ? {} : { backgroundSize: "contain", backgroundColor: "#000" } });
+    const showPrev = () => { prev.style.backgroundImage = st.ref ? `url("${imgSrc(st.ref)}")` : ""; };
     showPrev();
-    const nameIn = h("input", { type: "text", value: st.name, placeholder: "영어/한글 이름 (예: rooftop, 옥상)" });
+    const nameIn = h("input", { type: "text", value: isNew ? "" : name, placeholder: isBg ? "예: 교실, rooftop" : "예: 옥상_노을" });
     const err = h("p", { class: "hint", style: { color: "var(--danger)" } });
-    const pick = h("button", { class: "btn wide", onclick: async () => {
-      const f = await pickImage(); if (!f) return;
-      pick.textContent = "그림 처리 중…";
-      try { st.ref = addImage(await processImage(f, "bg")); showPrev(); if (!nameIn.value) nameIn.value = f.name.replace(/\.[^.]+$/, "").replace(/[^\w가-힣]/g, "_").slice(0, 20); }
-      catch (e) { err.textContent = e.message; }
-      pick.textContent = "🖼 그림 고르기";
-    } }, "🖼 그림 고르기");
+    const up = imageInput({ kind: isBg ? "bg" : "cg", label: st.ref ? "🖼 다른 그림으로 바꾸기" : "🖼 사진첩에서 그림 고르기", primary: !st.ref }, (ref, file) => {
+      st.ref = ref; showPrev();
+      if (!nameIn.value) nameIn.value = uniqueName(M, fileBase(file, isBg ? "배경" : "그림"));
+    });
     const foot = [h("button", { class: "btn primary grow", onclick: () => {
       const v = nameIn.value.trim();
       if (!v) return (err.textContent = "이름을 써 주세요.");
       if (!st.ref) return (err.textContent = "그림을 골라 주세요.");
-      if (v !== name && proj.backgrounds[v]) return (err.textContent = "같은 이름의 배경이 있어요.");
+      if (v !== name && M[v]) return (err.textContent = "같은 이름이 이미 있어요.");
+      const key = isBg ? "bg" : "cg";
       if (!isNew && v !== name) {
-        delete proj.backgrounds[name];
-        eachBlock((b) => { if (b && b.bg === name) b.bg = v; });
-        if (proj.titleBg === name) proj.titleBg = v;
+        delete M[name];
+        eachBlock((b) => { if (b && b[key] === name) b[key] = v; });
+        if (isBg && proj.titleBg === name) proj.titleBg = v;
       }
-      proj.backgrounds[v] = st.ref;
-      if (!proj.titleBg) proj.titleBg = v;
+      M[v] = st.ref;
+      if (isBg && !proj.titleBg) proj.titleBg = v;
       closeSheet(); changed();
     } }, "저장")];
     if (!isNew) {
       const del = h("button", { class: "btn danger", onclick: () => {
         if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "정말 삭제"; return; }
-        delete proj.backgrounds[name]; if (proj.titleBg === name) proj.titleBg = ""; closeSheet(); changed();
+        delete M[name]; if (isBg && proj.titleBg === name) proj.titleBg = ""; closeSheet(); changed();
       } }, "삭제");
       foot.push(del);
     }
-    openSheet(isNew ? "배경 추가" : "배경 편집", [prev, pick, field("이름 (스토리에서 부를 이름)", nameIn), err], foot);
+    openSheet((isNew ? "" : "") + (isBg ? (isNew ? "배경 추가" : "배경 편집") : (isNew ? "이벤트 그림 추가" : "이벤트 그림 편집")),
+      [prev, up, field("이름 (스토리에서 부를 이름)", nameIn), err], foot);
   }
 
   function charSheet(id) {
@@ -721,18 +787,17 @@
           h("div", { class: "pic", style: { backgroundImage: `url("${imgSrc(fc.v)}")` } }),
           h("input", { type: "text", value: fc.k, "aria-label": "표정 이름", oninput: (e) => (fc.k = e.target.value.trim()) }),
           h("div", { class: "row", style: { flexDirection: "column", gap: "4px" } },
-            h("button", { class: "btn", style: { padding: "6px 10px" }, onclick: async () => { const r = await faceImg(); if (r) { fc.v = r; draw(); } } }, "바꾸기"),
+            fileButton("바꾸기", "image/*", async (file) => { const r = await faceImg(file); if (r) { fc.v = r; draw(); } }),
             h("button", { class: "btn danger", style: { padding: "6px 10px" }, onclick: () => { st.faces.splice(j, 1); draw(); } }, "빼기")))),
         h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.white, onchange: (e) => (st.white = e.target.checked) }), "새로 넣는 그림의 흰 배경 지우기"),
-        h("button", { class: "btn dashed wide", onclick: async () => {
-          const r = await faceImg(); if (!r) return;
+        imageInput({ kind: "sprite", label: "+ 표정 그림 넣기 (사진첩)", primary: !st.faces.length, white: () => st.white }, (r) => {
           const base = ["normal", "smile", "sad", "angry", "shy", "surprised"].find((n) => !st.faces.some((f) => f.k === n)) || "face" + (st.faces.length + 1);
           st.faces.push({ k: base, v: r }); draw();
-        } }, "+ 표정 그림 넣기"),
+        }),
         err);
     };
-    async function faceImg() {
-      const f = await pickImage(); if (!f) return null;
+    async function faceImg(f) {
+      if (!f) return null;
       toast("그림 처리 중…");
       try { return addImage(await processImage(f, "sprite", st.white)); } catch (e) { err.textContent = e.message; return null; }
     }
@@ -804,7 +869,9 @@
         if (!v || v === name) { e.target.value = name; return; }
         if (v in proj.vars) { toast("같은 이름의 변수가 있어요"); e.target.value = name; return; }
         if (!IDENT.test(v)) { toast("변수 이름은 글자로 시작하고 기호 없이 써 주세요"); e.target.value = name; return; }
-        renameVar(name, v); changed();
+        renameVar(name, v);
+        // 바로 다시 그리면 지금 누르려는 버튼이 사라져서 터치가 씹혀요 → 조금 뒤에 다시 그리기
+        changed({ render: false }); setTimeout(() => { if (tab === "vars") render(); }, 400);
       } });
       const valIn = type === "bool"
         ? h("select", { onchange: (e) => { proj.vars[name] = e.target.value === "true"; changed({ render: false }); } },
@@ -883,7 +950,9 @@
         'vars: { 호감도: 0, 열쇠: false },\n\n{ set: { 호감도: +1 } }     // 1 더하기\n{ set: { 열쇠: "=true" } }  // 값 정하기'),
       L("5. 조건 — 만약 ~라면", "if 에 비교식을 쓰면 맞을 때 goto 장면으로, 아니면 else 장면으로 가요. >= 이상, <= 이하, == 같음, != 다름.",
         '{ if: "호감도 >= 3", goto: "고백", else: "친구엔딩" }'),
-      L("6. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("6. 이벤트 그림 — 그림 한 장 크게", "cgs 에 그림을 등록해 두고 { cg: \"이름\" } 으로 보여주고, { cg: \"\" } 로 숨겨요. 빈 문자열 \"\" 은 '아무것도 없음'이라는 뜻이에요.",
+        'cgs: { 옥상_노을: "img:..." },\n\n{ cg: "옥상_노을" }   // 보여주기\n"샬럿: 예쁘다…"\n{ cg: "" }            // 숨기기'),
+      L("7. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {
@@ -937,7 +1006,7 @@
       h("div", { class: "menu-list" },
         h("button", { class: "btn", onclick: exportGame }, h("span", {}, "🎮 게임 파일로 저장 (.html)"), h("small", {}, "누구나 열어서 플레이")),
         h("button", { class: "btn", onclick: exportBackup }, h("span", {}, "💾 백업 파일로 저장 (.json)"), h("small", {}, "창작기에서 다시 열기")),
-        h("button", { class: "btn", onclick: importBackup }, h("span", {}, "📂 백업 파일 열기"), h("small", {}, "새 작품으로 추가"))),
+        fileButton("📂 백업 파일 열기 (.json) — 새 작품으로 추가", ".json,application/json", importBackup)),
     ]);
   }
 
@@ -970,6 +1039,7 @@
       try { const id = uid(); P.images[id] = await toDataUrl(ref); return "img:" + id; } catch (e) { return ref; }
     };
     for (const k of Object.keys(P.backgrounds)) P.backgrounds[k] = await conv(P.backgrounds[k]);
+    for (const k of Object.keys(P.cgs || {})) P.cgs[k] = await conv(P.cgs[k]);
     for (const c of Object.values(P.characters)) for (const k of Object.keys(c.faces || {})) c.faces[k] = await conv(c.faces[k]);
     return P;
   }
@@ -999,10 +1069,8 @@ VN.mount(document.getElementById("game"), PROJECT);<\/script>
 </body></html>`;
     await download(safeName(proj.title) + ".html", html);
   }
-  function importBackup() {
-    const fi = $("#json-in"); fi.value = "";
-    fi.onchange = async () => {
-      const f = fi.files[0]; if (!f) return;
+  async function importBackup(f) {
+    {
       try {
         const j = JSON.parse(await f.text());
         const P = j.project || j;
@@ -1010,8 +1078,7 @@ VN.mount(document.getElementById("game"), PROJECT);<\/script>
         await newProject(normalize(P));
         toast("백업을 열었어요");
       } catch (e) { toast("이 파일은 열 수 없어요 (창작기 백업 .json 이 아니에요)"); }
-    };
-    fi.click();
+    }
   }
 
   // ---------- 프로젝트 열기/만들기 ----------

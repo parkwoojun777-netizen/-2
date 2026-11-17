@@ -35,7 +35,8 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; margin: 0; }
+html, body { height: 100%; margin: 0; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, label.btn, select, input, textarea, a { touch-action: manipulation; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-ui); overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -54,7 +55,7 @@ button { cursor: pointer; }
 .icon-btn { background: none; border: 0; width: 40px; height: 40px; border-radius: 10px; font-size: 20px; flex: none; }
 .icon-btn:hover { background: var(--surface-2); }
 
-#view { flex: 1; overflow-y: auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+#view { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
 .wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 
 #tabs { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--line);
@@ -76,7 +77,8 @@ h3.sec { margin: 6px 0 0; font-family: var(--f-story); font-size: 18px; }
 .btn.wide { width: 100%; padding: 13px; }
 .btn.dashed { border-style: dashed; background: transparent; color: var(--muted); }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
-input[type=text], input[type=number], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+/* 16px 미만이면 아이폰이 입력칸을 누를 때 화면을 확대해 버려요 */
+input[type=text], input[type=number], select, textarea { font-size: 16px; width: 100%; border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; min-width: 0; }
 textarea { resize: vertical; min-height: 84px; line-height: 1.6; }
 input[type=color] { width: 48px; height: 40px; border: 1px solid var(--line); border-radius: 10px; padding: 2px; background: var(--surface-2); }
 label.f { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500; color: var(--muted); min-width: 0; flex: 1; }
@@ -139,7 +141,7 @@ code, .code { font-family: var(--f-code); }
 .var-row .uses { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: -4px; }
 
 /* 코드 */
-.code-edit { font-family: var(--f-code); font-size: 13px; line-height: 1.55; background: var(--code-bg); color: var(--code-ink); border-color: var(--code-bg);
+.code-edit { font-family: var(--f-code); font-size: 14px; line-height: 1.55; background: var(--code-bg); color: var(--code-ink); border-color: var(--code-bg);
   min-height: 55vh; white-space: pre; overflow: auto; tab-size: 2; }
 .msg { font-size: 13px; padding: 8px 12px; border-radius: 10px; }
 .msg.ok { background: var(--accent-soft); color: var(--ink); }
@@ -157,7 +159,7 @@ details.lesson pre { background: var(--code-bg); color: var(--code-ink); padding
 @keyframes up { from { transform: translateY(30px); opacity: 0; } }
 #sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 4px 18px; }
 #sheet-head h2 { margin: 0; font-family: var(--f-story); font-size: 19px; }
-#sheet-body { overflow-y: auto; padding: 8px 18px 14px; display: flex; flex-direction: column; gap: 12px; }
+#sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 8px 18px 14px; display: flex; flex-direction: column; gap: 12px; }
 #sheet-foot { display: flex; gap: 8px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); flex-wrap: wrap; }
 #sheet-foot:empty { display: none; }
 #sheet-foot .grow { flex: 1; }
@@ -179,3 +181,13 @@ details.lesson pre { background: var(--code-bg); color: var(--code-ink); padding
   .var-row .del { grid-column: 2; justify-self: end; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* 그림 고르기: 투명한 파일 입력칸을 버튼 위에 그대로 덮어서, 손가락이 바로 입력칸을 누르게 해요 */
+label.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 200px; }
+.img-in { display: flex; flex-direction: column; gap: 8px; }
+.paste { min-height: 0 !important; height: 46px; resize: none; text-align: center; font-size: 14px !important; color: var(--muted); border-style: dashed !important; }
+.img-status { font-size: 13px; color: var(--muted); min-height: 1em; }
+.img-status.err { color: var(--danger); }
+.block.k-cg { --kc: var(--k-scene); } .picker .k-cg { --kc: var(--k-scene); }
