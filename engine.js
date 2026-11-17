@@ -176,7 +176,7 @@
   }
 
   function jump(scene) {
-    if (!STORY[scene]) { alert(`장면 "${scene}" 을(를) 찾을 수 없어요. story.js를 확인하세요.`); return; }
+    if (!STORY[scene]) { showError(`장면 "${scene}" 을(를) 찾을 수 없어요. story.js를 확인하세요.`); return; }
     S.scene = scene; S.index = 0; run();
   }
 
@@ -184,8 +184,8 @@
   function run() {
     while (true) {
       const list = STORY[S.scene];
-      if (!list) return alert(`장면 "${S.scene}" 이 없어요.`);
-      if (S.index >= list.length) return alert(`장면 "${S.scene}" 이 goto / end 없이 끝났어요.`);
+      if (!list) return showError(`장면 "${S.scene}" 이 없어요.`);
+      if (S.index >= list.length) return showError(`장면 "${S.scene}" 이 goto / end 없이 끝났어요.`);
       const cmd = list[S.index];
       S.lineIndex = S.index;
       S.index++;
@@ -320,7 +320,11 @@
       <p class="hint">오른쪽 끝 = 즉시 표시</p>
       <button class="slot" id="to-title"><b>타이틀로 돌아가기</b></button>`;
     $("#spd").oninput = (e) => { speed = 80 - +e.target.value; store(SPEED_KEY, speed); };
-    $("#to-title").onclick = () => { if (confirm("타이틀로 돌아갈까요? (저장 안 된 진행은 사라져요)")) toTitle(); };
+    $("#to-title").onclick = (e) => {
+      const b = e.currentTarget;
+      if (b.dataset.armed) return toTitle();
+      b.dataset.armed = 1; b.innerHTML = "<b>한 번 더 누르면 타이틀로 (저장 안 된 진행은 사라져요)</b>";
+    };
     el.panel.hidden = false;
   }
 
@@ -334,6 +338,7 @@
   function toggleSkip() { skip = !skip; auto = false; syncButtons(); if (skip && waitingTap) { finishTyping(); advance(); } }
 
   // ---------- 유틸 ----------
+  function showError(msg) { console.error(msg); el.box.hidden = false; el.name.hidden = true; el.text.textContent = "⚠️ " + msg; }
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
   let toastT;
   function toast(msg) { el.toast.textContent = msg; el.toast.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.toast.classList.remove("on"), 1600); }
