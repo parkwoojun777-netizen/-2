@@ -613,6 +613,13 @@
       waitingTap = false;
     }
 
+    // 대사 없이 화면만 보여주고 탭을 기다려요
+    function waitTap() {
+      el.box.hidden = true; el.choices.hidden = true; el.tapHint.hidden = false;
+      waitingTap = true; clearTimeout(autoTimer);
+      if (skip) autoTimer = later(advance, 80); else if (auto) autoTimer = later(advance, 1800);
+    }
+
     // ---------- 메인 실행 루프 ----------
     function run() {
       let guard = 0;
@@ -653,7 +660,10 @@
         }
         if (cmd.text !== undefined) { showLine("", cmd.text); return; }
         if (cmd.minigame) return minigame(cmd);
-        if (cmd.varImage !== undefined) applyVarImage(cmd);
+        if (cmd.varImage !== undefined) {
+          applyVarImage(cmd);
+          if (cmd.tapWait) { waitTap(); return; } // 그림을 보여주고 탭을 기다려요 (바로 엔딩 · 장면 이동이 덮지 않게)
+        }
         if (cmd.particles !== undefined) particles(cmd);
         if (cmd.tint !== undefined) setTint(cmd.tint);
         if (cmd.gauge !== undefined) showGauge(cmd.gauge, cmd.show !== false);
@@ -661,13 +671,7 @@
         if (cmd.sound) playSound(cmd.sound, cmd.volume);
         if (cmd.bgm !== undefined) playBgm(cmd.bgm, cmd.volume, cmd.fade);
         if (cmd.act) charAct(cmd.act, cmd.motion);
-        if (cmd.tap) {
-          // 대사 없이 그림만 보여주고 탭을 기다려요
-          el.box.hidden = true; el.choices.hidden = true; el.tapHint.hidden = false;
-          waitingTap = true; clearTimeout(autoTimer);
-          if (skip) autoTimer = later(advance, 80); else if (auto) autoTimer = later(advance, 1800);
-          return;
-        }
+        if (cmd.tap) { waitTap(); return; }
         if (cmd.bg) setBg(cmd.bg);
         if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {

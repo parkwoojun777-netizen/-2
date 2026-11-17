@@ -240,6 +240,17 @@
     if (!im) return h("p", { class: "hint" }, "게임 시작 때의 변수 값이면 이 자리의 그림을 숨겨요." + (follow ? " 변수가 바뀌면 그에 맞는 그림이 나타나요." : ""));
     return h("p", { class: "hint" }, `✅ 게임 시작 때의 변수 값이면 「${im}」 이(가) 보여요.` + (follow ? " 변수가 바뀌면 바로 그에 맞는 그림으로 바뀌어요." : " (이 블록을 지날 때 한 번 정해요)"));
   }
+  // 이 블록 앞뒤를 보고, 플레이어가 그림을 실제로 언제 보게 되는지 알려줘요
+  function flowHint(f) {
+    const nk = f._nextKind;
+    if (!f.tapWait && ["none", "end", "goto", "if"].includes(nk))
+      return h("p", { class: "warn" }, `⚠ 이 블록 바로 다음이 ${nk === "end" ? "엔딩" : nk === "goto" ? "장면 이동" : nk === "if" ? "조건 분기" : "장면의 끝"}이라, 그림이 나오자마자 화면이 넘어가서 안 보여요. '탭할 때까지 기다리기'를 켜거나, 이 블록 뒤에 대사를 넣어 주세요.`);
+    const parts = [];
+    if (f._prevLines) parts.push(`이 블록은 앞의 대사 ${f._prevLines}줄을 넘긴 다음에 나타나요.`);
+    if (f.tapWait) parts.push("그림이 나오면 대사 창을 숨기고 '▼ 탭'을 기다려요.");
+    else if (nk === "say" || nk === "narr") parts.push("그림은 바로 다음 대사와 함께 보여요.");
+    return parts.length ? h("p", { class: "hint" }, parts.join(" ")) : null;
+  }
   function imageChoices(target) {
     if (target === "pic") return Object.assign({ "": "숨기기 (이 자리 비우기)" }, Object.fromEntries(Object.keys(proj.pics).map((n) => [n, "🧩 " + n])));
     if (target === "bg") return Object.fromEntries(Object.keys(proj.backgrounds).map((n) => [n, n]));
@@ -304,7 +315,7 @@
         target: b.varImage, fit: b.fit || "contain",
         cases: (b.cases || []).map((x) => Object.assign(parseCond(x.if), { image: x.image == null ? "" : x.image })),
         else: b.else === undefined ? "__keep" : b.else,
-        slot: b.slot || "그림", x: b.x == null ? 50 : b.x, y: b.y == null ? 50 : b.y, w: b.w == null ? 25 : b.w, layer: b.layer || "front", anim: b.anim || "fade", live: b.live !== false };
+        slot: b.slot || "그림", x: b.x == null ? 50 : b.x, y: b.y == null ? 50 : b.y, w: b.w == null ? 25 : b.w, layer: b.layer || "front", anim: b.anim || "fade", live: b.live !== false, tapWait: !!b.tapWait };
       case "minigame": return {
         title: b.title || "", hint: b.hint || "", image: b.image || "", picks: String(b.picks || 0), labels: !!b.labels, goto: b.goto || "", score: b.score || "",
         objects: (b.objects || []).map((o) => Object.assign({
@@ -371,6 +382,7 @@
         if (els !== "__keep") o.else = els;
         if (f.target === "cg" && f.fit === "cover") o.fit = "cover";
         if (f.target === "pic") { Object.assign(o, { slot: f.slot || "그림", x: Math.round(f.x), y: Math.round(f.y), w: f.w, layer: f.layer, anim: f.anim }); if (f.live === false) o.live = false; }
+        if (f.tapWait) o.tapWait = true;
         return o;
       }
       case "minigame": {
@@ -472,7 +484,7 @@
         f.steps.slice(0, 4).map((st, j) => h("div", { class: "opt" }, `${j + 1}. ${st.image ? "🖼 " + st.image + " " : ""}${st.sound ? "🔊 " : ""}${st.fx || st.particles ? "✨ " : ""}${st.text ? (st.say ? st.say + ": " : "") + st.text.slice(0, 24) : "(탭)"}`)),
         f.steps.length > 4 ? h("div", { class: "opt" }, `… ${f.steps.length - 4}단계 더`) : null];
       case "gauge": return `📊 ${f.name === "all" ? "모든 게이지" : (proj.gauges[f.name] && proj.gauges[f.name].label) || f.name} ${f.show ? "보이기" : "숨기기"}`;
-      case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기${f.target === "pic" ? ` · 자리 「${f.slot}」 (${Math.round(f.x)}%, ${Math.round(f.y)}%) · 너비 ${f.w}%` : ""}`),
+      case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기${f.target === "pic" ? ` · 자리 「${f.slot}」 (${Math.round(f.x)}%, ${Math.round(f.y)}%) · 너비 ${f.w}%` : ""}${f.tapWait ? " · ▼ 탭 기다림" : ""}`),
         f.cases.map((c) => h("div", { class: "opt" }, `▸ ${c.var} ${c.op} ${c.val} 이면 → ${c.image || "숨기기"}`)),
         f.else !== "__keep" ? h("div", { class: "opt" }, `▸ ${f.cases.length ? "그 밖에는" : "항상"} → ${f.else || "숨기기"}`) : null];
       case "minigame": return [h("div", {}, `🎮 ${f.title || "그림 속 오브젝트 고르기"} · 🖼 ${f.image || "그림 없음"}${+f.picks ? ` · ${f.picks}개 고르기` : " · 자유롭게 고르기"}`),
@@ -549,6 +561,7 @@
         }
         if (kindOf(b) === "raw" && b && b.minigame) out.push(`${at}: 예전 미니게임("${b.minigame}")은 더 이상 쓰지 않아요. 삭제하고 새 미니게임 블록을 넣어 주세요.`);
         if (k === "varimg" && !f.cases.length && f.else === "__keep") out.push(`${at}: 변수 그림 블록에 보여줄 그림이 없어요.`);
+        if (k === "varimg" && !f.tapWait) { const nx = l[i + 1]; const nk = nx === undefined ? "none" : kindOf(nx); if (["none", "end", "goto", "if"].includes(nk)) out.push(`${at}: 변수 그림 바로 다음이 ${nk === "end" ? "엔딩" : nk === "goto" ? "장면 이동" : nk === "if" ? "조건 분기" : "장면의 끝"}이라 그림이 보이자마자 넘어가요. '탭할 때까지 기다리기'를 켜 주세요.`); }
         if (k === "varimg") {
           const ok = imageChoices(f.target);
           if (f.target !== "bg" && f.target !== "cg" && f.target !== "pic" && !proj.characters[f.target]) out.push(`${at}: 캐릭터 "${f.target}" 이 없어요.`);
@@ -785,6 +798,13 @@
     const isNew = !!newKind && !editing;
     const k = newKind || kindOf(list[i]);
     const f = Object.assign(isNew || !list[i] ? defaultForm(k) : toForm(list[i]), preset || {});
+    if (k === "varimg") {
+      const next = list[isNew ? i : i + 1], prev = list.slice(0, i).filter((b) => ["say", "narr"].includes(kindOf(b)));
+      f._nextKind = next === undefined ? "none" : kindOf(next);
+      f._prevLines = prev.length;
+      // 바로 뒤가 엔딩 · 장면 이동 · 조건 분기 · 아무것도 없으면, 그림이 보이기 전에 화면이 넘어가요 → 새 블록은 탭 기다리기를 켜요
+      if (isNew && ["none", "end", "goto", "if"].includes(f._nextKind)) f.tapWait = true;
+    }
     if (k === "raw") return rawSheet(list, i);
     const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
     const codeLine = h("code", { class: "hint", style: { whiteSpace: "pre-wrap", wordBreak: "break-all" } });
@@ -1675,6 +1695,9 @@
             Object.entries(imgs).map(([v, t]) => h("option", { value: v, selected: v === f.else }, t)))),
           f.else !== "__keep" ? preview(f.else) : null,
           startHint(f),
+          h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!f.tapWait, onchange: (e) => { f.tapWait = e.target.checked; redraw(); } }),
+            "그림을 보여준 뒤 탭할 때까지 기다리기"),
+          flowHint(f),
         ];
         if (isPic) {
           // 🧩 어디에 나올지: 미리보기 화면을 눌러서(끌어서) 위치, 슬라이더로 크기
