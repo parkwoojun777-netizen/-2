@@ -430,7 +430,7 @@
     return parts.length ? "{ " + parts.join(", ") + " }" : "{}";
   }
   function projectCode() {
-    const p = clone(proj); delete p.images;
+    const p = clone(proj); delete p.images; delete p.apk; // 그림 데이터와 앱 서명 키는 코드에 보여주지 않아요
     return "// 💡 왼쪽 탭에서 만든 내용이 자동으로 이 코드가 돼요.\n// 여기서 직접 고치고 [코드 적용]을 눌러도 돼요.\n// \"img:...\" 는 올린 그림을 가리키는 이름표예요.\n\nconst PROJECT = " + toCode(p) + ";\n";
   }
 
@@ -503,11 +503,13 @@
   if (!Array.isArray(clip)) clip = [];
   const openGroups = new WeakSet();                          // 펼쳐 둔 묶음
   let flashKey = "";
+  let mapMode = false; // 🗺 장면 지도 보기
   function setClip(blocks) { clip = clone(blocks); pref.set("clip", clip); }
   function stopSelecting() { selecting = false; selList = null; selIdx = new Set(); }
 
   function renderStory(w) {
     if (!proj.story[scene]) scene = proj.start in proj.story ? proj.start : Object.keys(proj.story)[0];
+    if (mapMode) return renderMap(w);
     const names = Object.keys(proj.story);
     const sel = h("select", { "aria-label": "장면 고르기", onchange: (e) => { scene = e.target.value; stopSelecting(); render(); } },
       names.map((n) => h("option", { value: n, selected: n === scene }, (n === proj.start ? "⭐ " : "") + n + (proj.memories.some((m) => m.scene === n) ? "  🎞" : ""))));
@@ -519,7 +521,9 @@
         scene === proj.start ? h("span", { class: "start-badge", style: { alignSelf: "center" } }, "⭐ 게임이 여기서 시작해요")
           : h("button", { class: "btn", onclick: () => { proj.start = scene; changed(); toast(`"${scene}" 에서 시작해요`); } }, "⭐ 시작 장면으로"),
         h("button", { class: "btn" + (selecting ? " primary" : ""), onclick: () => { if (selecting) stopSelecting(); else selecting = true; render(); } },
-          selecting ? "✓ 선택 끝내기" : "☑ 여러 개 선택 (복사 · 묶기)")
+          selecting ? "✓ 선택 끝내기" : "☑ 여러 개 선택 (복사 · 묶기)"),
+        h("button", { class: "btn", onclick: () => branchSheet("choice") }, "🔀 분기 만들기"),
+        h("button", { class: "btn", onclick: () => { stopSelecting(); mapMode = true; render(); } }, "🗺 장면 지도")
       )
     );
     const list = proj.story[scene];
@@ -695,9 +699,202 @@
         h("button", { class: "btn", onclick: () => { list.splice(i + 1, 0, clone(fromForm(k, f))); flashAt(i + 1); closeSheet(); changed(); } }, "복제"),
         h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); pickKind(list, i + 1, prefix); } }, "아래에 추가"),
         clip.length ? h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); paste(list, i + 1, prefix); } }, `📋 아래에 붙여넣기`) : null,
+        !prefix && i > 0 ? h("button", { class: "btn", onclick: () => { list[i] = fromForm(k, f); splitSheet(list, i); } }, "✂ 여기서 장면 나누기") : null,
         del);
     }
     openSheet(`${isNew ? "새 " : ""}${KINDS[k].label}`, [body, codeLine], foot);
+  }
+
+  // ===== 🔀 장면 나누기 · 분기 만들기 · 장면 지도 =====
+  function uniqueScene(base) { let n = base, i = 2; while (proj.story[n]) n = `${base} ${i++}`; return n; }
+
+  // 이 블록부터 끝까지를 새 장면으로 옮기고, 원래 장면 끝에 "장면 이동"을 넣어요
+  function splitSheet(list, i) {
+    const nameIn = h("input", { type: "text", value: uniqueScene(`${scene} (이어서)`) });
+    const err = h("p", { class: "hint", style: { color: "var(--danger)" } });
+    openSheet("✂ 여기서 장면 나누기", [
+      h("p", { class: "hint" }, `「${scene}」의 ${i + 1}번 블록부터 끝까지(${list.length - i}개)를 새 장면으로 옮겨요. 원래 장면 끝에는 새 장면으로 가는 [장면 이동]이 들어가서 플레이는 그대로예요.`),
+      field("새 장면 이름", nameIn), err,
+    ], [h("button", { class: "btn primary grow", onclick: () => {
+      const v = nameIn.value.trim();
+      if (!v) return (err.textContent = "이름을 써 주세요.");
+      if (proj.story[v]) return (err.textContent = "같은 이름의 장면이 있어요.");
+      proj.story[v] = list.splice(i);
+      list.push({ goto: v });
+      flashKey = String(list.length - 1);
+      closeSheet(); changed(); toast(`「${v}」 장면을 만들었어요`);
+    } }, "나누기")]);
+  }
+
+  // 장면의 마지막 블록이 이미 다른 곳으로 보내는 블록인지 (그 뒤에 넣으면 실행되지 않아요)
+  function closingLast(list) {
+    const b = list[list.length - 1];
+    if (b === undefined || isGroup(b)) return null;
+    const k = kindOf(b), f = toForm(b);
+    const closed = k === "goto" || k === "end" || (k === "if" && f.else) || (k === "choice" && f.options.every((o) => o.goto));
+    return closed ? b : null;
+  }
+  function branchSheet(mode) {
+    mode = mode || "choice";
+    const last = closingLast(proj.story[scene]);
+    const replace = { on: !!last };
+    const replaceBox = last ? h("label", { class: "check warn-check" }, h("input", { type: "checkbox", checked: true, onchange: (e) => (replace.on = e.target.checked) }),
+      `이 장면은 마지막 블록(${inlineCode(last).slice(0, 60)})에서 다른 곳으로 넘어가요. 그 블록을 지우고 그 자리에 넣을게요.`) : null;
+    const tabs = h("div", { class: "chips" },
+      h("button", { class: "chip" + (mode === "choice" ? " on" : ""), onclick: () => branchSheet("choice") }, "🔀 선택지로 나누기"),
+      h("button", { class: "chip" + (mode === "ending" ? " on" : ""), onclick: () => branchSheet("ending") }, "🏁 변수로 엔딩 나누기"));
+    const err = h("p", { class: "hint", style: { color: "var(--danger)" } });
+    const others = Object.keys(proj.story);
+    if (mode === "choice") {
+      const st = { lead: "", opts: [0, 1].map((k) => ({ text: "", name: uniqueScene(`${scene}-${"ABCD"[k]}`), after: "later", ending: "" })) };
+      const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } });
+      const draw = () => {
+        body.innerHTML = "";
+        put(body,
+          field("선택지 앞에 나올 말 (선택)", h("input", { type: "text", value: st.lead, placeholder: "예: 어떻게 대답할까?", oninput: (e) => (st.lead = e.target.value) })),
+          st.opts.map((o, j) => h("div", { class: "opt-card" },
+            h("div", { class: "row" }, h("b", { style: { flex: "none" } }, `갈래 ${"ABCD"[j]}`),
+              st.opts.length > 2 ? h("button", { class: "btn danger", style: { flex: "none", marginLeft: "auto", padding: "5px 10px" }, onclick: () => { st.opts.splice(j, 1); draw(); } }, "빼기") : null),
+            h("input", { type: "text", value: o.text, placeholder: "플레이어가 볼 선택지", oninput: (e) => (o.text = e.target.value) }),
+            field("새로 만들 장면 이름", h("input", { type: "text", value: o.name, oninput: (e) => (o.name = e.target.value) })),
+            field("그 장면이 끝나면", h("select", { onchange: (e) => { o.after = e.target.value; draw(); } },
+              h("option", { value: "later", selected: o.after === "later" }, "나중에 정할게요"),
+              h("option", { value: "end", selected: o.after === "end" }, "🏁 엔딩으로 끝내기"),
+              others.map((n) => h("option", { value: "goto:" + n, selected: o.after === "goto:" + n }, `「${n}」 장면으로 합치기`)))),
+            o.after === "end" ? field("엔딩 이름", h("input", { type: "text", value: o.ending, placeholder: `예: ${"ABCD"[j]} 엔딩`, oninput: (e) => (o.ending = e.target.value) })) : null)),
+          st.opts.length < 4 ? h("button", { class: "btn dashed wide", onclick: () => { st.opts.push({ text: "", name: uniqueScene(`${scene}-${"ABCD"[st.opts.length]}`), after: "later", ending: "" }); draw(); } }, "+ 갈래 추가") : null);
+      };
+      draw();
+      openSheet("분기 만들기", [tabs, h("p", { class: "hint" }, `「${scene}」 끝에 선택지를 넣고, 고른 것마다 새 장면을 만들어 연결해요.`), replaceBox, body, err], [h("button", { class: "btn primary grow", onclick: () => {
+        const names = st.opts.map((o) => o.name.trim());
+        if (names.some((n) => !n)) return (err.textContent = "장면 이름을 모두 써 주세요.");
+        if (new Set(names).size !== names.length || names.some((n) => proj.story[n])) return (err.textContent = "장면 이름이 겹쳐요. 다른 이름을 써 주세요.");
+        const list = proj.story[scene];
+        if (last && replace.on) list.pop();
+        if (st.lead.trim()) list.push(st.lead.trim());
+        list.push({ choice: st.opts.map((o, j) => ({ text: o.text.trim() || `선택지 ${"ABCD"[j]}`, goto: names[j] })) });
+        st.opts.forEach((o, j) => {
+          const l = ["(여기에 이 길의 이야기를 써 주세요)"];
+          if (o.after === "end") l.push({ end: o.ending.trim() || `${names[j]} 엔딩` });
+          else if (o.after.startsWith("goto:")) l.push({ goto: o.after.slice(5) });
+          proj.story[names[j]] = l;
+        });
+        flashKey = String(list.length - 1);
+        closeSheet(); changed(); toast(`장면 ${names.length}개를 만들어 연결했어요. 🗺 지도에서 볼 수 있어요`);
+      } }, "만들기")]);
+      return;
+    }
+    // 변수로 엔딩 나누기
+    const vars = Object.keys(proj.vars);
+    const st = { var: vars[0] || "", rules: [{ op: ">=", val: "3", name: "행복한 엔딩" }, { op: ">=", val: "1", name: "보통 엔딩" }], other: "쓸쓸한 엔딩" };
+    const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } });
+    const draw = () => {
+      body.innerHTML = "";
+      put(body,
+        vars.length ? null : h("p", { class: "hint", style: { color: "var(--danger)" } }, "변수가 없어요. [변수] 탭에서 먼저 만들어 주세요 (예: 호감도)."),
+        field("어떤 변수로 나눌까요?", varsSelect(st.var, (v) => (st.var = v))),
+        h("p", { class: "hint" }, "위에서부터 차례로 확인해서 처음 맞는 엔딩으로 가요."),
+        st.rules.map((r, j) => h("div", { class: "opt-card" },
+          h("div", { class: "grid3" },
+            field(j ? "아니고 만약" : "만약", h("select", { onchange: (e) => (r.op = e.target.value) }, [">=", ">", "==", "<=", "<", "!="].map((x) => h("option", { value: x, selected: r.op === x }, `${st.var || "변수"} ${x}`)))),
+            field("값", h("input", { type: "text", value: r.val, oninput: (e) => (r.val = e.target.value) })),
+            field("엔딩 이름", h("input", { type: "text", value: r.name, oninput: (e) => (r.name = e.target.value) }))),
+          st.rules.length > 1 ? h("button", { class: "btn danger", style: { alignSelf: "flex-end", padding: "5px 10px" }, onclick: () => { st.rules.splice(j, 1); draw(); } }, "빼기") : null)),
+        st.rules.length < 5 ? h("button", { class: "btn dashed wide", onclick: () => { st.rules.push({ op: ">=", val: "0", name: `엔딩 ${st.rules.length + 2}` }); draw(); } }, "+ 엔딩 추가") : null,
+        field("어디에도 안 맞으면", h("input", { type: "text", value: st.other, oninput: (e) => (st.other = e.target.value) })));
+    };
+    draw();
+    openSheet("분기 만들기", [tabs, h("p", { class: "hint" }, `「${scene}」 끝에 조건 분기를 넣고, 엔딩마다 장면을 하나씩 만들어요.`), replaceBox, body, err], [h("button", { class: "btn primary grow", onclick: () => {
+      if (!st.var) return (err.textContent = "변수를 골라 주세요.");
+      const ends = [...st.rules.map((r) => r.name.trim()), st.other.trim()];
+      if (ends.some((n) => !n)) return (err.textContent = "엔딩 이름을 모두 써 주세요.");
+      const names = ends.map((n) => n);
+      if (new Set(names).size !== names.length) return (err.textContent = "엔딩 이름이 겹쳐요.");
+      const sceneNames = []; const taken = new Set();
+      names.forEach((n) => { let s = uniqueScene(n); while (taken.has(s)) s = uniqueScene(s + " "); taken.add(s); sceneNames.push(s); });
+      const list = proj.story[scene];
+      if (last && replace.on) list.pop();
+      st.rules.forEach((r, j) => list.push({ if: `${st.var} ${r.op} ${r.val}`, goto: sceneNames[j] }));
+      list.push({ goto: sceneNames[sceneNames.length - 1] });
+      names.forEach((n, j) => (proj.story[sceneNames[j]] = ["(여기에 엔딩 이야기를 써 주세요)", { end: n }]));
+      flashKey = String(list.length - 1);
+      closeSheet(); changed(); toast(`엔딩 장면 ${names.length}개를 만들었어요. 🗺 지도에서 볼 수 있어요`);
+    } }, "만들기")]);
+  }
+
+  // 장면에서 나가는 길 모으기
+  function sceneLinks(list) {
+    const out = [], endings = [];
+    walk(list, (b) => {
+      if (!b || typeof b !== "object") return;
+      const k = kindOf(b);
+      if (k === "goto") out.push({ to: b.goto, label: "" });
+      if (k === "if") { out.push({ to: b.goto, label: `${b.if}` }); if (b.else) out.push({ to: b.else, label: "아니면" }); }
+      if (k === "choice") b.choice.forEach((o) => o.goto && out.push({ to: o.goto, label: `▸ ${o.text}` }));
+      if (k === "minigame") { if (b.goto) out.push({ to: b.goto, label: "🎮 끝나면" }); (b.objects || []).forEach((o) => o.goto && out.push({ to: o.goto, label: `🎮 ${o.name}` })); }
+      if (k === "end") endings.push(b.end || "THE END");
+    });
+    return { out, endings };
+  }
+  function renderMap(w) {
+    const S = proj.story, names = Object.keys(S);
+    const info = Object.fromEntries(names.map((n) => [n, sceneLinks(S[n])]));
+    // 시작 장면에서부터 몇 번 만에 닿는지로 줄을 나눠요
+    const level = {}; const q = [proj.start]; if (S[proj.start]) level[proj.start] = 0;
+    while (q.length) { const n = q.shift(); for (const e of info[n].out) if (S[e.to] && level[e.to] === undefined) { level[e.to] = level[n] + 1; q.push(e.to); } }
+    const rows = [];
+    names.forEach((n) => { const l = level[n] === undefined ? -1 : level[n]; (rows[l < 0 ? 999 : l] = rows[l < 0 ? 999 : l] || []).push(n); });
+    const total = names.reduce((a, n) => a + info[n].endings.length, 0);
+    w.append(h("div", { class: "row" },
+      h("button", { class: "btn", onclick: () => { mapMode = false; render(); } }, "← 블록 목록으로"),
+      h("span", { class: "hint" }, `장면 ${names.length}개 · 엔딩 ${total}개`)));
+    const box = h("div", { class: "map" });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "map-lines");
+    box.append(svg);
+    const cards = {};
+    rows.forEach((r, li) => {
+      if (!r) return;
+      const row = h("div", { class: "map-row" }, li === 999 ? h("div", { class: "map-row-label" }, "⚠ 시작에서 닿지 않는 장면") : null);
+      r.forEach((n) => {
+        const inf = info[n];
+        const card = h("button", { class: "map-card" + (n === proj.start ? " start" : "") + (inf.endings.length ? " ending" : "") + (li === 999 ? " lost" : ""),
+          onclick: () => { scene = n; mapMode = false; render(); } },
+          h("b", {}, (n === proj.start ? "⭐ " : "") + n),
+          h("small", {}, `블록 ${flatList(S[n]).length}개${proj.memories.some((m) => m.scene === n) ? " · 🎞" : ""}`),
+          inf.endings.map((e) => h("span", { class: "map-end" }, "🏁 " + e)),
+          !inf.out.length && !inf.endings.length ? h("span", { class: "map-warn" }, "끝이 정해지지 않았어요") : null,
+          inf.out.filter((e) => !S[e.to]).map((e) => h("span", { class: "map-warn" }, `없는 장면 → ${e.to}`)));
+        cards[n] = card; row.append(card);
+      });
+      box.append(row);
+    });
+    w.append(box, h("p", { class: "hint" }, "장면을 누르면 그 장면을 편집해요. 선은 장면 이동 · 선택지 · 조건 분기로 이어진 길이에요."));
+    // 화면에 놓인 뒤 선 그리기
+    requestAnimationFrame(() => {
+      const br = box.getBoundingClientRect();
+      svg.setAttribute("width", br.width); svg.setAttribute("height", br.height);
+      const NS = "http://www.w3.org/2000/svg";
+      const defs = document.createElementNS(NS, "defs");
+      defs.innerHTML = '<marker id="map-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="map-arrowhead"/></marker>';
+      svg.append(defs);
+      for (const [n, inf] of Object.entries(info)) {
+        const seen = new Set();
+        for (const e of inf.out) {
+          if (!cards[e.to] || seen.has(e.to)) continue; seen.add(e.to);
+          const a = cards[n].getBoundingClientRect(), b = cards[e.to].getBoundingClientRect();
+          const x1 = a.left + a.width / 2 - br.left, y1 = a.bottom - br.top;
+          const x2 = b.left + b.width / 2 - br.left, y2 = b.top - br.top;
+          const back = y2 <= y1;
+          const p = document.createElementNS(NS, "path");
+          const d = back
+            ? `M${a.right - br.left},${a.top + a.height / 2 - br.top} C${a.right - br.left + 40},${a.top - br.top} ${b.right - br.left + 40},${b.bottom - br.top} ${b.right - br.left},${b.top + b.height / 2 - br.top}`
+            : `M${x1},${y1} C${x1},${(y1 + y2) / 2} ${x2},${(y1 + y2) / 2} ${x2},${y2}`;
+          p.setAttribute("d", d); p.setAttribute("class", "map-line" + (back ? " back" : "")); p.setAttribute("marker-end", "url(#map-arrow)");
+          svg.append(p);
+        }
+      }
+    });
   }
 
   function scenesSelect(val, on, allowEmpty) {
@@ -1393,6 +1590,7 @@
       return;
     }
     P.images = proj.images;
+    if (proj.apk) P.apk = proj.apk;
     proj = normalize(P);
     codeDirty = false;
     changed({ render: false });
@@ -1477,6 +1675,7 @@
       h("p", { class: "hint" }, "작품은 이 브라우저 안에만 저장돼요. 다른 기기로 옮기거나 잃어버리지 않으려면 백업 파일을 저장해 두세요."),
       h("div", { class: "menu-list" },
         h("button", { class: "btn", onclick: exportGame }, h("span", {}, "🎮 게임 파일로 저장 (.html)"), h("small", {}, "누구나 열어서 플레이")),
+        h("button", { class: "btn", onclick: apkSheet }, h("span", {}, "📱 안드로이드 앱으로 저장 (.apk)"), h("small", {}, "폰에 설치하는 앱")),
         h("button", { class: "btn", onclick: exportBackup }, h("span", {}, "💾 백업 파일로 저장 (.json)"), h("small", {}, "창작기에서 다시 열기")),
         fileButton("📂 백업 파일 열기 (.json) — 새 작품으로 추가", ".json,application/json", importBackup)),
     ]);
@@ -1521,15 +1720,16 @@
     const P = await bundledProject();
     await download(safeName(proj.title) + ".json", JSON.stringify({ format: "novel-workshop", version: 1, project: P }));
   }
-  async function exportGame() {
-    toast("게임 파일 만드는 중…");
+  // 플레이용 게임 파일(HTML 한 장) 만들기 — 이미지까지 모두 안에 넣어요
+  async function gameHtml() {
     let engine = "";
     try { engine = await (await fetch("engine.js")).text(); } catch (e) {}
     if (!engine.includes("window.VN")) { const s = document.getElementById("engine-src"); engine = s ? s.textContent : ""; }
-    if (!engine) return toast("엔진 코드를 읽지 못했어요");
+    if (!engine) throw new Error("엔진 코드를 읽지 못했어요");
     const P = await bundledProject();
+    delete P.apk; // 앱 서명 키는 게임 파일에 넣지 않아요
     const esc = (s) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!-{2}/g, "<\\!-" + "-"); // 주의: 이 파일 안에 HTML 주석 시작 기호를 그대로 쓰면 페이지에 넣었을 때 코드가 통째로 무시돼요
-    const html = `<!doctype html>
+    return `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>${(proj.title || "Visual Novel").replace(/[<&]/g, "")}</title>
@@ -1540,7 +1740,115 @@
 <script>const PROJECT = ${esc(JSON.stringify(P))};
 VN.mount(document.getElementById("game"), PROJECT);<\/script>
 </body></html>`;
-    await download(safeName(proj.title) + ".html", html);
+  }
+  async function exportGame() {
+    toast("게임 파일 만드는 중…");
+    try { await download(safeName(proj.title) + ".html", await gameHtml()); }
+    catch (e) { toast(e.message); }
+  }
+
+  // ===== 📱 안드로이드 앱(.apk) 만들기 =====
+  function loadImage(src) {
+    return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("그림을 불러오지 못했어요")); im.src = src; });
+  }
+  // 앱 아이콘 (192×192 PNG): 캐릭터 얼굴 / 타이틀 배경 / 기본
+  async function makeIcon(kind) {
+    if (kind === "default") return null;
+    const S = 192, cv = document.createElement("canvas"); cv.width = cv.height = S;
+    const cx = cv.getContext("2d");
+    cx.beginPath(); cx.roundRect ? cx.roundRect(0, 0, S, S, 40) : cx.rect(0, 0, S, S); cx.clip();
+    if (kind === "char") {
+      const c = Object.values(proj.characters)[0];
+      const ref = c && (c.faces[Object.keys(c.faces).find((k) => /smile|normal/.test(k))] || Object.values(c.faces)[0]);
+      if (!ref) return null;
+      cx.fillStyle = c.color || "#8fd3ff"; cx.fillRect(0, 0, S, S);
+      const g = cx.createLinearGradient(0, 0, 0, S); g.addColorStop(0, "rgba(255,255,255,.35)"); g.addColorStop(1, "rgba(0,0,0,.15)");
+      cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+      const im = await loadImage(imgSrc(ref));
+      const w = S * 1.7, h = (im.naturalHeight / im.naturalWidth) * w;
+      cx.drawImage(im, (S - w) / 2, S * 0.06, w, h);
+    } else {
+      const ref = proj.backgrounds[proj.titleBg] || Object.values(proj.backgrounds)[0];
+      if (!ref) return null;
+      const im = await loadImage(imgSrc(ref));
+      const sc = Math.max(S / im.naturalWidth, S / im.naturalHeight);
+      cx.drawImage(im, (S - im.naturalWidth * sc) / 2, (S - im.naturalHeight * sc) / 2, im.naturalWidth * sc, im.naturalHeight * sc);
+    }
+    const blob = await new Promise((r) => cv.toBlob(r, "image/png"));
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+  async function saveApk(name, bytes) {
+    let api = null;
+    try { api = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) {}
+    if (!api) {
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.android.package-archive" }));
+      const a = h("a", { href: url, download: name + ".apk" }); document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return "saved";
+    }
+    try { await api.save({ filename: name + ".apk", data: new Blob([bytes]) }); return "saved"; }
+    catch (e) {
+      if (e && e.code === "declined") return "declined";
+      if (e && (e.code === "rejected_extension" || e.code === "extension_not_enabled")) {
+        // 이 화면에서는 .apk 저장이 막혀 있어서 .zip 이름으로 저장해요 (이름만 바꾸면 그대로 설치돼요)
+        try { await api.save({ filename: name + ".apk.zip", data: new Blob([bytes]) }); return "zip"; }
+        catch (e2) { return (e2 && e2.code) || "error"; }
+      }
+      return (e && e.code) || "error";
+    }
+  }
+  function apkSheet() {
+    const st = { label: (proj.title || "").slice(0, NovelApk.MAX_LABEL), icon: Object.keys(proj.characters).length ? "char" : Object.keys(proj.backgrounds).length ? "bg" : "default" };
+    const preview = h("div", { class: "apk-icon" });
+    const drawPreview = async () => {
+      preview.style.backgroundImage = "";
+      preview.textContent = st.icon === "default" ? "📖" : "";
+      try { const png = await makeIcon(st.icon); if (png) preview.style.backgroundImage = `url("${URL.createObjectURL(new Blob([png], { type: "image/png" }))}")`; } catch (e) {}
+      previewName.textContent = st.label || "앱 이름";
+    };
+    const previewName = h("span", {});
+    const iconBtns = h("div", { class: "chips" }, Object.entries({ char: "캐릭터 얼굴", bg: "타이틀 배경", default: "기본 아이콘" }).map(([k, t]) =>
+      h("button", { class: "chip" + (st.icon === k ? " on" : ""), onclick: (e) => { st.icon = k; iconBtns.querySelectorAll(".chip").forEach((c) => c.classList.remove("on")); e.currentTarget.classList.add("on"); drawPreview(); } }, t)));
+    const status = h("div", { class: "msg", hidden: true });
+    const go = h("button", { class: "btn primary grow", onclick: async () => {
+      go.disabled = true; status.hidden = false; status.className = "msg ok";
+      try {
+        if (!window.NovelApk || !window.APK_TEMPLATE_B64) throw new Error("앱 만들기 도구를 불러오지 못했어요");
+        status.textContent = "① 게임 파일 묶는 중…";
+        const html = await gameHtml();
+        status.textContent = "② 아이콘 만드는 중…";
+        const icon = await makeIcon(st.icon).catch(() => null);
+        if (!proj.apk || !proj.apk.key) {
+          status.textContent = "③ 이 작품의 서명 키 만드는 중… (처음 한 번만)";
+          const pkg = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
+          proj.apk = { pkg, key: await NovelApk.makeKey(proj.title || "Novel") };
+          changed({ render: false }); await persist();
+        }
+        status.textContent = "④ 앱 포장하고 서명하는 중…";
+        const bytes = await NovelApk.build({ template: window.APK_TEMPLATE_B64, html, label: st.label || proj.title, icon, pkgSuffix: proj.apk.pkg, key: proj.apk.key });
+        const mb = (bytes.length / 1048576).toFixed(1);
+        const r = await saveApk(safeName(st.label || proj.title), bytes);
+        if (r === "saved") status.textContent = `✅ 앱을 만들었어요 (${mb}MB). 아래 설치 방법을 보고 폰에서 열어 주세요.`;
+        else if (r === "zip") status.textContent = `✅ 앱을 만들었어요 (${mb}MB). 이 화면에서는 .apk 로 바로 저장할 수 없어서 "${safeName(st.label || proj.title)}.apk.zip" 으로 저장했어요. 파일 앱에서 이름 끝의 ".zip" 만 지우면 설치할 수 있어요.`;
+        else if (r === "declined") status.textContent = "저장을 취소했어요.";
+        else { status.className = "msg err"; status.textContent = "저장하지 못했어요 (" + r + ")"; }
+      } catch (e) { status.className = "msg err"; status.textContent = "앱을 만들지 못했어요: " + e.message; }
+      go.disabled = false;
+    } }, "📱 앱 만들기");
+    openSheet("안드로이드 앱 (.apk)", [
+      h("div", { class: "apk-head" }, preview, previewName),
+      field("앱 이름 (홈 화면에 보여요)", h("input", { type: "text", value: st.label, maxlength: String(NovelApk.MAX_LABEL), oninput: (e) => { st.label = e.target.value; previewName.textContent = st.label || "앱 이름"; } })),
+      h("label", { class: "f" }, "앱 아이콘", iconBtns),
+      status,
+      h("details", { class: "lesson", open: true }, h("summary", {}, "설치하는 방법"),
+        h("p", {}, "1. [앱 만들기]로 .apk 파일을 저장해요."),
+        h("p", {}, "2. 폰의 파일 앱(다운로드 폴더)에서 파일을 눌러요. 처음이면 '출처를 알 수 없는 앱 설치'를 허용해 달라고 나와요 → 허용."),
+        h("p", {}, "3. [설치]. 'Play 프로텍트' 경고가 나오면 [무시하고 설치]를 눌러요. (직접 만든 앱이라 나오는 안내예요)"),
+        h("p", {}, "· 같은 작품은 항상 같은 서명 키로 만들어서, 고친 뒤 다시 만들어 설치하면 업데이트돼요. 키는 이 작품(과 백업 파일)에 저장돼요 — 백업 파일은 남에게 주지 마세요."),
+        h("p", {}, "· 안드로이드 7.0 이상에서 돌아가요. 저장 슬롯은 앱 안에 따로 저장돼요."),
+        h("p", {}, "· 아이폰 앱은 애플의 정책상 이 방법으로 만들 수 없어요. 아이폰에서는 [게임 파일 (.html)]을 쓰세요.")),
+    ], [go]);
+    drawPreview();
   }
   async function importBackup(f) {
     {
@@ -1598,7 +1906,7 @@ VN.mount(document.getElementById("game"), PROJECT);<\/script>
   // ---------- 탭 ----------
   document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => {
     if (b.dataset.tab === "play") return playSheet();
-    tab = b.dataset.tab; pref.set("tab", tab); $("#view").scrollTop = 0; render();
+    tab = b.dataset.tab; pref.set("tab", tab); mapMode = false; $("#view").scrollTop = 0; render();
   }));
   $("#btn-menu").onclick = menuSheet;
 

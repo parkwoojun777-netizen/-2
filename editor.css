@@ -231,3 +231,28 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
   border: 2px solid var(--accent); border-radius: 14px; padding: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .2); }
 .select-bar b { flex-basis: 100%; font-size: 14px; }
 .select-bar .btn { padding: 8px 11px; font-size: 13px; }
+
+/* 앱(.apk) 만들기 */
+.apk-head { display: flex; align-items: center; gap: 12px; }
+.apk-icon { width: 64px; height: 64px; border-radius: 16px; background: var(--accent) center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 2px 8px rgba(0,0,0,.2); flex: none; }
+.apk-head span { font-weight: 700; font-size: 16px; }
+
+/* 🗺 장면 지도 */
+.map { position: relative; display: flex; flex-direction: column; gap: 34px; padding: 6px 0 20px; }
+.map-lines { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.map-line { fill: none; stroke: color-mix(in srgb, var(--accent) 70%, var(--muted)); stroke-width: 2; }
+.map-line.back { stroke-dasharray: 5 4; stroke: var(--muted); }
+.map-arrowhead { fill: color-mix(in srgb, var(--accent) 70%, var(--muted)); }
+.map-row { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.map-row-label { flex-basis: 100%; text-align: center; font-size: 12px; color: var(--danger); font-weight: 700; }
+.map-card { position: relative; z-index: 1; min-width: 120px; max-width: 220px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.map-card b { font-family: var(--f-story); font-size: 15px; }
+.map-card small { color: var(--muted); font-size: 12px; }
+.map-card.start { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.map-card.ending { border-color: var(--k-end); }
+.map-card.lost { border-style: dashed; opacity: .8; }
+.map-end { font-size: 12px; font-weight: 700; color: var(--k-end); }
+.map-warn { font-size: 11.5px; color: var(--danger); }
+.warn-check { align-items: flex-start; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); border-radius: 10px; padding: 10px; }
+.warn-check input { margin-top: 3px; flex: none; }
