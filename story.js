@@ -26,6 +26,9 @@
    { cgSeq: [ { image: "추억_교실", text: "…" }, { image: "추억_윙크", sound: "띠링", fx: "flash" } ] }
                                         → CG 넘기기: 탭할 때마다 그림 · 대사 · 효과음 · 효과 (text 없으면 탭 기다리기)
    { sound: "띠링" }                     → 효과음 (sounds 에 등록)
+   { bgm: "교실의오후", fade: 2 }  /  { bgm: "" } → 배경음악 틀기 / 끄기 (반복 재생)
+   { act: "charlotte", motion: "tremble" } → 캐릭터 움직임: hop nod shake jolt sway (한 번) ·
+                                          tremble shiver breathe float stop (계속) · down sink up closer away tilt fade reset (자세)
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
@@ -33,6 +36,7 @@
 
 const PROJECT = {
   title: "방과 후의 교실",
+  titleBgm: "교실의오후",   // 타이틀 화면 음악 (첫 탭부터)
   subtitle: "A Visual Novel",
   titleBg: "classroom",
   start: "프롤로그",
@@ -68,6 +72,7 @@ const PROJECT = {
   // 효과음: 이름 → 소리 파일
   sounds: {
     띠링: "sounds/chime.wav",
+    교실의오후: "sounds/afternoon.mp3",
   },
 
   // 오브젝트 그림 (미니게임에서 일러스트 위에 놓는 물건): 이름 → 이미지
@@ -101,6 +106,7 @@ const PROJECT = {
   story: {
     프롤로그: [
       { bg: "classroom" },
+      { bgm: "교실의오후", volume: 0.7, fade: 2 },
       "종례가 끝나고 30분. 교실에는 아무도 남아 있지 않을 줄 알았다.",
       "창문으로 들어온 햇빛이 칠판 위에 길게 늘어져 있다.",
       { show: "charlotte", face: "normal" },
@@ -125,8 +131,10 @@ const PROJECT = {
       "나: 왠지 네가 혼자 있을 것 같아서.",
       { show: "charlotte", face: "shy" },
       { shake: true },
-      "샬럿: 무, 무슨 소리야 갑자기……!",
+      { say: "샬럿", act: "jolt", text: "무, 무슨 소리야 갑자기……!" },
+      { act: "charlotte", motion: "tremble" },
       "샬럿: ……바보.",
+      { act: "charlotte", motion: "stop" },
       { goto: "공통" },
     ],
     공통: [
@@ -150,7 +158,7 @@ const PROJECT = {
       ] },
     ],
     약속: [
-      { say: "샬럿", face: "smile", text: "그럼 내일, 여기서." },
+      { say: "샬럿", face: "smile", act: "hop", text: "그럼 내일, 여기서." },
       { particles: "별가루", mode: "burst", x: 50, y: 30 },
       { goto: "판정" },
     ],
@@ -175,7 +183,8 @@ const PROJECT = {
       { end: "GOOD END — 노을빛 약속" },
     ],
     보통엔딩: [
-      { say: "샬럿", face: "normal", text: "……뭐, 됐어. 먼저 갈게." },
+      { bgm: "", fade: 3 },
+      { say: "샬럿", face: "normal", act: "down", text: "……뭐, 됐어. 먼저 갈게." },
       { hide: "charlotte" },
       { tint: "gray" },
       { particles: "rain" },

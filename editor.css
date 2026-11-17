@@ -297,3 +297,9 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .block.k-cgseq, .picker .k-cgseq { --kc: var(--k-scene); }
 .block.k-sound, .picker .k-sound { --kc: var(--k-flow); }
 .sound-row .btn { padding: 7px 12px; }
+
+/* 🕺 캐릭터 움직임 미리보기 · 🎵 배경음악 */
+.motion-prev { display: flex; flex-direction: column; gap: 6px; }
+.motion-box { aspect-ratio: 4 / 3; cursor: default; }
+.block.k-bgm, .picker .k-bgm { --kc: var(--k-flow); }
+.block.k-act, .picker .k-act { --kc: var(--k-char); }

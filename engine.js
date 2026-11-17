@@ -26,6 +26,25 @@
   .vn-chars img[data-pos="left"]{left:25%}.vn-chars img[data-pos="right"]{left:75%}
   .vn-chars img.dim{filter:brightness(.6) drop-shadow(0 0 12px rgba(0,0,0,.35))}
   .vn-chars img.bounce{animation:vn-bounce .3s}
+  .vn-chars img{--dy:0%;--sc:1;--rot:0deg;translate:0 var(--dy);scale:var(--sc);rotate:var(--rot);transform-origin:50% 100%}
+  .vn-chars img.posing{transition:opacity .4s,transform .4s,filter .3s,left .4s,translate .6s cubic-bezier(.3,.7,.3,1),scale .6s cubic-bezier(.3,.7,.3,1),rotate .5s}
+  .vn-chars img.m-hop{animation:vn-hop .55s cubic-bezier(.3,.7,.4,1)}
+  @keyframes vn-hop{35%{translate:0 calc(var(--dy) - 8%)}70%{translate:0 calc(var(--dy) + 1%)}}
+  .vn-chars img.m-nod{animation:vn-nod .7s ease-in-out}
+  @keyframes vn-nod{25%{translate:0 calc(var(--dy) + 2.5%)}50%{translate:0 var(--dy)}75%{translate:0 calc(var(--dy) + 1.5%)}}
+  .vn-chars img.m-shake{animation:vn-shakex .5s}
+  @keyframes vn-shakex{20%{translate:-4% var(--dy)}40%{translate:4% var(--dy)}60%{translate:-3% var(--dy)}80%{translate:2% var(--dy)}}
+  .vn-chars img.m-jolt{animation:vn-jolt .45s cubic-bezier(.2,.9,.3,1)}
+  @keyframes vn-jolt{20%{translate:0 calc(var(--dy) - 4%);scale:calc(var(--sc) * 1.04)}}
+  .vn-chars img.m-sway{animation:vn-sway .9s ease-in-out}
+  @keyframes vn-sway{30%{rotate:calc(var(--rot) - 4deg)}70%{rotate:calc(var(--rot) + 3deg)}}
+  .vn-chars img.l-tremble{animation:vn-tremble .14s linear infinite}
+  @keyframes vn-tremble{0%,100%{translate:0 var(--dy)}25%{translate:-.7% calc(var(--dy) + .3%)}50%{translate:.7% var(--dy)}75%{translate:-.4% calc(var(--dy) - .3%)}}
+  .vn-chars img.l-shiver{animation:vn-tremble .07s linear infinite}
+  .vn-chars img.l-breathe{animation:vn-breathe 3.2s ease-in-out infinite}
+  @keyframes vn-breathe{50%{scale:calc(var(--sc) * 1.01) calc(var(--sc) * 1.022)}}
+  .vn-chars img.l-float{animation:vn-float 2.6s ease-in-out infinite}
+  @keyframes vn-float{50%{translate:0 calc(var(--dy) - 2.5%)}}
   @keyframes vn-bounce{50%{transform:translate(-50%,-2%)}}
   .vn-root.portrait .vn-chars img{height:72%;bottom:14%}
   .vn-root.portrait .vn-chars img[data-pos="left"]{left:30%}.vn-root.portrait .vn-chars img[data-pos="right"]{left:70%}
@@ -291,6 +310,7 @@
     const SAVE_KEY = "vn_save_" + (P.title || "game");
     const SPEED_KEY = "vn_speed";
     const SFX_KEY = "vn_sfx_volume";
+    const BGM_KEY = "vn_bgm_volume";
     const SOUNDS = P.sounds || {};    // 효과음: 이름 → 소리 파일
 
     let replay = null; // 회상방에서 다시 보는 장면
@@ -360,6 +380,40 @@
       el.cg.classList.toggle("on", !!src);
     }
 
+    // ---------- 🕺 캐릭터 움직임 ----------
+    // 한 번: hop 깡총 · nod 끄덕 · shake 도리도리 · jolt 깜짝 · sway 갸웃
+    // 계속: tremble 덜덜 · shiver 부들부들 · breathe 숨쉬기 · float 둥실둥실   (stop 으로 멈춤)
+    // 자세: down 살짝 아래로 · sink 많이 아래로 · up 위로 · closer 다가오기 · away 멀어지기 · tilt 기울이기 · fade 반투명 · reset 제자리
+    const ONCE = ["hop", "nod", "shake", "jolt", "sway"];
+    const LOOPS = ["tremble", "shiver", "breathe", "float"];
+    const POSES = { down: { dy: 5 }, sink: { dy: 14 }, up: { dy: -4 }, closer: { sc: 1.18, dy: 7 }, away: { sc: 0.86 }, tilt: { rot: -5 }, fade: { op: 0.45 } };
+    function applyPose(im, c) {
+      const p = c.pose || {};
+      im.classList.add("posing");
+      im.style.setProperty("--dy", (p.dy || 0) + "%");
+      im.style.setProperty("--sc", p.sc || 1);
+      im.style.setProperty("--rot", (p.rot || 0) + "deg");
+      im.style.opacity = p.op != null ? p.op : "";
+      LOOPS.forEach((l) => im.classList.toggle("l-" + l, c.loop === l));
+    }
+    function charAct(id, motion) {
+      const ids = id === "all" ? Object.keys(S.chars) : [id];
+      ids.forEach((cid) => {
+        const c = S.chars[cid];
+        if (!c) return;
+        if (ONCE.includes(motion)) {
+          const im = el.chars.querySelector(`img[data-id="${window.CSS && CSS.escape ? CSS.escape(cid) : cid}"]`);
+          if (im) { ONCE.forEach((m) => im.classList.remove("m-" + m)); void im.offsetWidth; im.classList.add("m-" + motion); later(() => im.classList.remove("m-" + motion), 1000); }
+          return;
+        }
+        if (LOOPS.includes(motion)) c.loop = motion;
+        else if (motion === "stop") c.loop = null;
+        else if (motion === "reset") { c.loop = null; c.pose = {}; }
+        else if (POSES[motion]) c.pose = Object.assign({}, c.pose, POSES[motion]);
+      });
+      renderChars();
+    }
+
     function renderChars(instant) {
       [...el.chars.children].forEach((im) => {
         if (!S.chars[im.dataset.id]) { im.classList.remove("on"); later(() => im.remove(), instant ? 0 : 400); }
@@ -381,6 +435,7 @@
           im.classList.remove("bounce"); void im.offsetWidth; im.classList.add("bounce");
         }
         im.dataset.pos = c.pos || "center";
+        applyPose(im, c);
       });
     }
 
@@ -527,9 +582,10 @@
           const id = charIdByName(cmd.say);
           if (id && cmd.face) {
             const prev = S.chars[id] || {};
-            S.chars[id] = { face: cmd.face, pos: cmd.pos || prev.pos || "center" };
+            S.chars[id] = Object.assign({}, prev, { face: cmd.face, pos: cmd.pos || prev.pos || "center" });
             renderChars();
           }
+          if (id && cmd.act && S.chars[id]) charAct(id, cmd.act); // 대사와 함께 움직이기
           showLine(cmd.say || "", cmd.text || "");
           return;
         }
@@ -540,6 +596,8 @@
         if (cmd.tint !== undefined) setTint(cmd.tint);
         if (cmd.gauge !== undefined) showGauge(cmd.gauge, cmd.show !== false);
         if (cmd.sound) playSound(cmd.sound, cmd.volume);
+        if (cmd.bgm !== undefined) playBgm(cmd.bgm, cmd.volume, cmd.fade);
+        if (cmd.act) charAct(cmd.act, cmd.motion);
         if (cmd.tap) {
           // 대사 없이 그림만 보여주고 탭을 기다려요
           el.box.hidden = true; el.choices.hidden = true; el.tapHint.hidden = false;
@@ -551,7 +609,7 @@
         if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {
           const prev = S.chars[cmd.show] || {};
-          S.chars[cmd.show] = { face: cmd.face || prev.face || "normal", pos: cmd.pos || prev.pos || "center" };
+          S.chars[cmd.show] = Object.assign({}, prev, { face: cmd.face || prev.face || "normal", pos: cmd.pos || prev.pos || "center" });
           renderChars();
         }
         if (cmd.hide) { if (cmd.hide === "all") S.chars = {}; else delete S.chars[cmd.hide]; renderChars(); }
@@ -1102,7 +1160,7 @@
       else if (t === "cg") setCg(im, c.fit);
       else if (CHARS[t]) {
         const prev = S.chars[t] || {};
-        S.chars[t] = { face: im || prev.face || "normal", pos: c.pos || prev.pos || "center" };
+        S.chars[t] = Object.assign({}, prev, { face: im || prev.face || "normal", pos: c.pos || prev.pos || "center" });
         renderChars();
       }
     }
@@ -1244,6 +1302,7 @@
 
     function toTitle() {
       replay = null; pfxStop();
+      if (P.titleBgm) playBgm(P.titleBgm, 1, 0.8); else playBgm("", 1, 0.6);
       el.scene.dataset.tint = ""; el.tintfx.dataset.tint = "";
       S = null; clearInterval(typing); clearTimeout(autoTimer); auto = skip = false; syncButtons();
       el.ending.hidden = true; el.panel.hidden = true; el.title.hidden = false;
@@ -1267,12 +1326,14 @@
         setTint(S.tint);
         // 예전 저장 파일은 효과 하나, 새 저장 파일은 여러 개
         [].concat(S.pfx || []).forEach((c) => particles(c));
+        if (S.bgm) playBgm(S.bgm.name, S.bgm.volume, 0.8); else playBgm("", 1, 0.6);
         S.hud = S.hud || [];
         renderChars(true);
         S.log.pop();
       } else {
         S = fresh(scene);
         unlock("seen", S.scene);
+        if (bgm.name && bgm.name === P.titleBgm) playBgm("", 1, 1); // 타이틀 음악은 게임이 시작되면 꺼져요
       }
       R.querySelectorAll(".vn-gauge").forEach((g) => g.remove()); hudPrev = {};
       updateHud();
@@ -1324,6 +1385,45 @@
 
     // ---------- 🔊 효과음 ----------
     let sfxVolume = load(SFX_KEY, 0.8);
+
+    // ---------- 🎵 배경음악 ----------
+    let bgmVolume = load(BGM_KEY, 0.6);
+    const bgm = { audio: null, name: "", vol: 1, timer: null };
+    function fadeTo(a, target, sec, done) {
+      clearInterval(bgm.timer);
+      if (!a) return done && done();
+      if (!(sec > 0)) { a.volume = Math.max(0, Math.min(1, target)); return done && done(); }
+      const start = a.volume, t0 = performance.now();
+      const id = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / (sec * 1000));
+        try { a.volume = Math.max(0, Math.min(1, start + (target - start) * k)); } catch (e) {}
+        if (k >= 1) { clearInterval(id); if (done) done(); }
+      }, 50);
+      bgm.timer = id;
+    }
+    function playBgm(name, vol, fade) {
+      if (S) S.bgm = name ? { name, volume: vol == null ? 1 : +vol } : null;
+      const f = fade == null ? 1 : +fade;
+      const old = bgm.audio;
+      if (name && name === bgm.name && old) { bgm.vol = vol == null ? 1 : +vol; fadeTo(old, bgm.vol * bgmVolume, f); return; }
+      bgm.name = name || ""; bgm.audio = null;
+      if (old) fadeTo(old, 0, f, () => { try { old.pause(); } catch (e) {} });
+      if (!name) return;
+      const src = img(SOUNDS[name] || "");
+      if (!src) return console.warn("없는 배경음악:", name);
+      try {
+        const a = new Audio(src); a.loop = true; a.volume = 0;
+        bgm.audio = a; bgm.vol = vol == null ? 1 : +vol;
+        const p = a.play(); if (p && p.catch) p.catch(() => { bgm.pending = true; }); // 아직 화면을 안 눌렀으면 첫 탭 때 시작
+        setTimeout(() => { if (bgm.audio === a) fadeTo(a, bgm.vol * bgmVolume, f); }, 30);
+      } catch (e) {}
+    }
+    function stopBgm() { if (bgm.audio) { try { bgm.audio.pause(); } catch (e) {} } clearInterval(bgm.timer); bgm.audio = null; bgm.name = ""; }
+    // 휴대폰 정책: 첫 탭 전에 막힌 음악은 첫 탭 때 다시 틀어요
+    R.addEventListener("pointerdown", () => { if (bgm.pending && bgm.audio) { bgm.pending = false; bgm.audio.play().catch(() => {}); } });
+    // 앱이 뒤로 가면 음악도 잠깐 멈춰요
+    function onVis() { if (!bgm.audio) return; if (document.hidden) bgm.audio.pause(); else bgm.audio.play().catch(() => {}); }
+    document.addEventListener("visibilitychange", onVis);
     function playSound(name, vol) {
       if (skip || sfxVolume <= 0) return;
       const src = img(SOUNDS[name] || "");
@@ -1340,10 +1440,12 @@
       el.panelBody.innerHTML = `
         <label class="vn-setting">글자 속도<input type="range" min="0" max="80" step="4" value="${80 - speed}"></label>
         <p class="vn-hint">오른쪽 끝 = 바로 표시</p>
+        <label class="vn-setting">배경음악 크기<input type="range" min="0" max="1" step="0.05" value="${bgmVolume}" class="vn-bgm"></label>
         <label class="vn-setting">효과음 크기<input type="range" min="0" max="1" step="0.05" value="${sfxVolume}" class="vn-sfx"></label>
         ${S ? '<button class="vn-slot vn-totitle"><b>타이틀로 돌아가기</b></button>' : ""}`;
       el.panelBody.querySelector("input").oninput = (e) => { speed = 80 - +e.target.value; store(SPEED_KEY, speed); };
       el.panelBody.querySelector(".vn-sfx").oninput = (e) => { sfxVolume = +e.target.value; store(SFX_KEY, sfxVolume); };
+      el.panelBody.querySelector(".vn-bgm").oninput = (e) => { bgmVolume = +e.target.value; store(BGM_KEY, bgmVolume); if (bgm.audio) { clearInterval(bgm.timer); bgm.audio.volume = bgm.vol * bgmVolume; } };
       const tt = el.panelBody.querySelector(".vn-totitle");
       if (tt) tt.onclick = () => {
         if (tt.dataset.armed) return toTitle();
@@ -1408,7 +1510,7 @@
 
     return {
       destroy() {
-        dead = true; mgClear(); cancelAnimationFrame(pfx.raf); clearInterval(typing); timers.forEach(clearTimeout);
+        dead = true; mgClear(); stopBgm(); document.removeEventListener("visibilitychange", onVis); cancelAnimationFrame(pfx.raf); clearInterval(typing); timers.forEach(clearTimeout);
         document.removeEventListener("keydown", onKey);
         if (ro) ro.disconnect();
         root.innerHTML = "";
