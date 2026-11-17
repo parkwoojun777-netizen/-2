@@ -209,3 +209,9 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 7px 12px; font-size: 13px; }
 .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
 .chip.add { border-style: dashed; color: var(--muted); background: transparent; }
+
+/* 입자 효과 미리보기 (누른 곳 = 나오는 지점) */
+.pfx-box { background: #000; }
+.pfx-box.nopick { cursor: default; }
+.pfx-stage { position: absolute; inset: 0; pointer-events: none; }
+.pfx-box .pos-dot { z-index: 5; }

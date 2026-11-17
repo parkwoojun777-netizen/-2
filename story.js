@@ -18,7 +18,8 @@
    { minigame: "pick", image: "classroom", picks: 1, objects: [ { name: "사탕", x: 30, y: 60, text: "…", set: { 호감도: +1 } } ] }
                                         → 미니게임: 그림 위 오브젝트를 골라 변수 바꾸기 (hidden: true 면 숨은 오브젝트)
    { particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 } → 입자 효과
-                                        (petal/snow/sparkle/heart/rain/dot/steam · fall/spread/burst · { particles: "off" } 로 끄기)
+                                        (petal/leaf/snow/rain/storm/drip/fog/steam/smoke/ember/sparkle/firefly/dot/bubble/heart/confetti
+                                         · fall/spread/burst · { particles: "off" } 로 끄기)
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
@@ -143,7 +144,9 @@ const PROJECT = {
       { say: "샬럿", face: "normal", text: "……뭐, 됐어. 먼저 갈게." },
       { hide: "charlotte" },
       { tint: "gray" },
+      { particles: "rain" },
       "텅 빈 교실에 나 혼자 남았다.",
+      "창밖에는 어느새 비가 내리고 있었다.",
       { fade: "black" },
       { end: "NORMAL END — 빈 교실" },
     ],

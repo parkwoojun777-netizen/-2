@@ -74,6 +74,7 @@
   .vn-toast{position:absolute;z-index:30;left:50%;top:20%;transform:translate(-50%,-10px);background:var(--vn-accent);color:#0b1020;padding:8px 18px;border-radius:999px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
   .vn-toast.on{opacity:1;transform:translate(-50%,0)}
   .vn-error{color:#ffb4b4}
+  .vn-root.vn-preview .vn-menu,.vn-root.vn-preview .vn-box,.vn-root.vn-preview .vn-title{display:none!important}
   .vn-scene{position:absolute;inset:0;transition:filter .8s}
   .vn-scene[data-tint="sepia"]{filter:sepia(.8) contrast(.95) brightness(1.02)}
   .vn-scene[data-tint="gray"]{filter:grayscale(1) contrast(1.05)}
@@ -453,9 +454,17 @@
     // ---------- 화면 색감 ----------
     function setTint(t) { S.tint = t || ""; el.scene.dataset.tint = S.tint; el.tintfx.dataset.tint = S.tint; }
 
-    // ---------- 입자 효과 (벚꽃 · 눈 · 반짝이 · 하트 · 비 · 빛 알갱이) ----------
-    const PFX_COLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff", steam: "#ffffff" };
-    const pfx = { list: [], emit: null, raf: 0, last: 0, acc: 0, ctx: null, w: 0, h: 0, dpr: 1 };
+    // ---------- 입자 효과 ----------
+    // 모양마다 움직임이 달라요. mode: fall(화면 전체) / spread(한 지점에서 계속) / burst(한 지점에서 한 번 펑)
+    const PFX_COLOR = {
+      petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff", steam: "#ffffff",
+      drip: "#9fd4ff", smoke: "#2b2b31", fog: "#e6ecf2", storm: "#b8c8e8", ember: "#ff8a3d", leaf: "", firefly: "#d8ff7a", bubble: "#bfefff", confetti: "",
+    };
+    const PALETTE = { leaf: ["#d9822b", "#c0392b", "#e0a82e", "#8e5b2a", "#b5651d"], confetti: ["#ff5d8f", "#ffd23f", "#3bceac", "#5d9cec", "#ac92eb", "#ff8a5c"] };
+    const RATE_FALL = { rain: 70, storm: 140, sparkle: 12, dot: 12, steam: 6, smoke: 7, fog: 1.1, drip: 4, ember: 14, leaf: 6, firefly: 3, bubble: 6, confetti: 25 };
+    const RATE_POINT = { steam: 5, smoke: 11, fog: 1.2, drip: 3, ember: 25, firefly: 4, bubble: 8, confetti: 30, rain: 40, storm: 50 };
+    const BURST = { steam: 10, smoke: 14, fog: 6, drip: 16, confetti: 60, ember: 40, firefly: 15, bubble: 18 };
+    const pfx = { list: [], emit: null, raf: 0, last: 0, acc: 0, ctx: null, w: 0, h: 0, dpr: 1, bolt: 0 };
     function pfxResize() {
       pfx.dpr = Math.min(2, window.devicePixelRatio || 1);
       pfx.w = R.clientWidth || 1; pfx.h = R.clientHeight || 1;
@@ -465,47 +474,121 @@
     function particles(cmd) {
       if (!cmd || !cmd.particles || cmd.particles === "off") { pfx.emit = null; if (S) S.pfx = null; return; }
       pfxResize();
+      const shape = cmd.particles in PFX_COLOR ? cmd.particles : "dot";
       const c = {
-        shape: PFX_COLOR[cmd.particles] ? cmd.particles : "dot", mode: cmd.mode || "fall",
-        color: cmd.color || PFX_COLOR[cmd.particles] || "#ffffff",
+        shape, mode: cmd.mode || "fall", color: cmd.color || PFX_COLOR[shape] || "",
         x: cmd.x == null ? 50 : +cmd.x, y: cmd.y == null ? 50 : +cmd.y,
         amount: Math.min(3, Math.max(1, +cmd.amount || 2)),
       };
-      if (c.mode === "burst") for (let i = 0; i < c.amount * (c.shape === "steam" ? 10 : 28); i++) spawn(c);
-      else { pfx.emit = c; if (S) S.pfx = cmd; }
+      if (c.mode === "burst") for (let i = 0; i < c.amount * (BURST[shape] || 28); i++) spawn(c);
+      else {
+        pfx.emit = c; pfx.bolt = performance.now() + 1500; if (S) S.pfx = cmd;
+        // 안개 · 반딧불은 천천히 생겨서, 처음부터 어느 정도 깔려 있게 미리 만들어 둬요
+        const warm = c.mode === "fall" ? { fog: 7, firefly: 8 }[shape] : 0;
+        for (let i = 0; i < (warm || 0) * c.amount; i++) { spawn(c); const q = pfx.list[pfx.list.length - 1]; if (q) { q.life = q.max * (0.15 + Math.random() * 0.5); q.x = Math.random() * pfx.w; } }
+      }
       if (!pfx.raf) { pfx.last = performance.now(); pfx.raf = requestAnimationFrame(tick); }
     }
     function pfxStop() { pfx.emit = null; pfx.list = []; cancelAnimationFrame(pfx.raf); pfx.raf = 0; if (pfx.ctx) pfx.ctx.clearRect(0, 0, el.pfx.width, el.pfx.height); }
+
     function spawn(c) {
-      const W = pfx.w, H = pfx.h, u = Math.max(0.7, Math.min(W, H) / 420);
-      const p = { shape: c.shape, color: c.color, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 3, sway: Math.random() * 6.28,
-        size: (5 + Math.random() * 6) * u * (c.shape === "snow" ? 0.55 : c.shape === "dot" ? 0.5 : 1), life: 0, g: 0, drag: 0, fade: true };
-      if (c.mode === "fall") {
-        p.x = Math.random() * W * 1.2 - W * 0.1; p.y = -20;
-        if (c.shape === "rain") { p.vx = -50 * u; p.vy = (650 + Math.random() * 300) * u; p.max = 3; }
-        else if (c.shape === "sparkle" || c.shape === "dot") { p.y = Math.random() * H; p.vx = (Math.random() - 0.5) * 20 * u; p.vy = -(10 + Math.random() * 25) * u; p.max = 2 + Math.random() * 2.5; }
-        else { p.vx = (Math.random() * 45 - 10) * u; p.vy = (35 + Math.random() * 45) * u; p.max = 40; p.fade = false; }
-      } else {
-        p.x = (W * c.x) / 100; p.y = (H * c.y) / 100;
-        const a = Math.random() * Math.PI * 2, burst = c.mode === "burst";
-        const sp = (burst ? 140 + Math.random() * 320 : 40 + Math.random() * 130) * u;
-        p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
-        p.max = burst ? 1.4 + Math.random() * 1.4 : 2.2 + Math.random() * 2.2;
-        p.drag = burst ? 2.2 : 0.35;
-        p.g = (c.shape === "sparkle" || c.shape === "dot" ? 8 : c.shape === "rain" ? 300 : 35) * u;
-      }
-      if (c.shape === "steam") {
-        // 수증기: 크고 흐릿한 덩어리가 위로 피어오르면서 커지고 옅어져요
-        p.size = (14 + Math.random() * 14) * u; p.grow = 1.2 + Math.random() * 1.2; p.fade = true; p.drag = 0.3; p.g = -6 * u;
-        if (c.mode === "fall") { p.x = Math.random() * W; p.y = H + 20; p.vx = (Math.random() - 0.5) * 16 * u; p.vy = -(25 + Math.random() * 35) * u; p.max = 4 + Math.random() * 3; }
-        else {
-          const a = -Math.PI / 2 + (Math.random() - 0.5) * (c.mode === "burst" ? 1.8 : 1.0);
-          const sp = (c.mode === "burst" ? 70 + Math.random() * 110 : 22 + Math.random() * 38) * u;
-          p.x += (Math.random() - 0.5) * 36 * u; p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
-          p.max = c.mode === "burst" ? 1.8 + Math.random() * 1.2 : 2.4 + Math.random() * 1.8;
+      if (pfx.list.length > 700) return;
+      const W = pfx.w, H = pfx.h, u = Math.max(0.7, Math.min(W, H) / 420), rnd = Math.random;
+      const fall = c.mode === "fall", burst = c.mode === "burst";
+      const px = (W * c.x) / 100, py = (H * c.y) / 100;
+      const pal = PALETTE[c.shape];
+      const p = { shape: c.shape, color: c.color || (pal ? pal[(rnd() * pal.length) | 0] : "#ffffff"), x: px, y: py, vx: 0, vy: 0, g: 0, drag: 0,
+        life: 0, max: 3, size: 6 * u, rot: rnd() * 6.28, vr: (rnd() - 0.5) * 3, sway: rnd() * 6.28, swayAmp: 0, fade: true, alphaMul: 1, grow: 0, wander: 0 };
+      const radial = (lo, hi) => { const an = rnd() * 6.28, sp = (lo + rnd() * (hi - lo)) * u; p.vx = Math.cos(an) * sp; p.vy = Math.sin(an) * sp; };
+      const up = (cone, lo, hi) => { const an = -Math.PI / 2 + (rnd() - 0.5) * cone, sp = (lo + rnd() * (hi - lo)) * u; p.vx = Math.cos(an) * sp; p.vy = Math.sin(an) * sp; };
+      const fromTop = () => { p.x = rnd() * W * 1.2 - W * 0.1; p.y = -20; };
+      const fromBottom = () => { p.x = rnd() * W; p.y = H + 20; };
+      const point = (lo, hi) => { radial(burst ? hi * 0.9 : lo, burst ? hi * 2.7 : hi); p.drag = burst ? 2.2 : 0.35; p.max = burst ? 1.4 + rnd() * 1.4 : 2.2 + rnd() * 2.2; };
+      switch (c.shape) {
+        case "petal": case "heart": case "leaf":
+          p.size = (5 + rnd() * 6) * u * (c.shape === "leaf" ? 1.25 : 1); p.swayAmp = 0.5;
+          if (fall) { fromTop(); p.vx = (rnd() * 45 - 10) * u; p.vy = (35 + rnd() * 45) * u; p.max = 40; p.fade = false; }
+          else { point(40, 170); p.g = 35 * u; }
+          break;
+        case "snow":
+          p.size = (3 + rnd() * 3.5) * u; p.swayAmp = 0.5;
+          if (fall) { fromTop(); p.vx = (rnd() * 30 - 10) * u; p.vy = (30 + rnd() * 40) * u; p.max = 40; p.fade = false; }
+          else { point(40, 170); p.g = 35 * u; }
+          break;
+        case "sparkle": case "dot":
+          p.size = (5 + rnd() * 6) * u * (c.shape === "dot" ? 0.5 : 1);
+          if (fall) { p.x = rnd() * W; p.y = rnd() * H; p.vx = (rnd() - 0.5) * 20 * u; p.vy = -(10 + rnd() * 25) * u; p.max = 2 + rnd() * 2.5; }
+          else { point(40, 170); p.g = 8 * u; }
+          break;
+        case "rain": case "storm": {
+          const heavy = c.shape === "storm";
+          if (fall) { fromTop(); p.vx = (heavy ? -170 : -50) * u; p.vy = ((heavy ? 950 : 650) + rnd() * 300) * u; p.max = 3; p.fade = false; }
+          else { p.x = px + (rnd() - 0.5) * 50 * u; p.vx = (rnd() - 0.5) * 30 * u; p.vy = (300 + rnd() * 300) * u; p.g = 400 * u; p.max = 1.6; p.fade = false; }
+          break;
         }
+        case "steam":
+          p.size = (14 + rnd() * 14) * u; p.grow = 1.2 + rnd() * 1.2; p.drag = 0.3; p.g = -6 * u; p.alphaMul = 0.2;
+          if (fall) { fromBottom(); p.vx = (rnd() - 0.5) * 16 * u; p.vy = -(25 + rnd() * 35) * u; p.max = 4 + rnd() * 3; }
+          else { up(burst ? 1.8 : 1.0, burst ? 70 : 22, burst ? 180 : 60); p.x += (rnd() - 0.5) * 36 * u; p.max = burst ? 1.8 + rnd() * 1.2 : 2.4 + rnd() * 1.8; }
+          break;
+        case "smoke":
+          p.size = (18 + rnd() * 20) * u; p.grow = 1.5 + rnd() * 2; p.alphaMul = 0.8; p.g = -4 * u; p.drag = 0.4; p.swayAmp = 0.6; p.dense = true;
+          if (fall) { fromBottom(); p.vx = (rnd() - 0.5) * 20 * u; p.vy = -(20 + rnd() * 30) * u; p.max = 5 + rnd() * 3; }
+          else if (burst) { radial(60, 220); p.drag = 1.6; p.max = 2 + rnd() * 1.5; }
+          else { up(0.55, 55, 120); p.x += (rnd() - 0.5) * 16 * u; p.max = 3.5 + rnd() * 2.5; p.g = -12 * u; p.drag = 0.25; p.size *= 0.75; p.grow = 2.6 + rnd() * 2; p.swayAmp = 1.2; }
+          break;
+        case "fog":
+          p.size = (0.4 + rnd() * 0.4) * W; p.alphaMul = 0.38; p.envelope = true; p.fade = false; p.dense = true;
+          if (fall) { const dir = rnd() < 0.5 ? 1 : -1; p.y = H * (0.15 + rnd() * 0.85); p.x = rnd() * W; p.vx = dir * (8 + rnd() * 14) * u; p.vy = (rnd() - 0.5) * 3 * u; p.max = 14 + rnd() * 10; }
+          else { radial(burst ? 30 : 8, burst ? 90 : 30); p.drag = burst ? 0.8 : 0.1; p.max = burst ? 4 + rnd() * 3 : 8 + rnd() * 6; p.size *= 0.6; }
+          break;
+        case "drip":
+          p.size = (3.4 + rnd() * 2) * u; p.g = 900 * u; p.splash = true; p.ground = H * (0.78 + rnd() * 0.2); p.max = 6; p.fade = false;
+          if (fall) { p.x = rnd() * W; p.y = -10; p.vy = (50 + rnd() * 150) * u; }
+          else if (burst) { radial(120, 380); p.vy -= 200 * u; p.g = 700 * u; p.splash = false; p.fade = true; p.max = 1.2 + rnd(); p.size *= 0.7; }
+          else { p.x = px + (rnd() - 0.5) * 6 * u; p.vy = 0; p.ground = Math.max(py + 20 * u, H * (0.8 + rnd() * 0.15)); }
+          break;
+        case "ember":
+          p.size = (2.2 + rnd() * 2.6) * u; p.glow = true; p.wander = 60 * u; p.flicker = true;
+          if (fall) { fromBottom(); p.vx = (rnd() - 0.5) * 30 * u; p.vy = -(50 + rnd() * 90) * u; p.max = 3 + rnd() * 3; }
+          else if (burst) { radial(150, 420); p.drag = 1.8; p.g = 120 * u; p.max = 1 + rnd() * 1.4; }
+          else { up(0.9, 60, 160); p.g = -10 * u; p.max = 1.5 + rnd() * 2; }
+          break;
+        case "firefly":
+          p.size = (3 + rnd() * 2.4) * u; p.glow = true; p.wander = 40 * u; p.blink = true; p.envelope = true; p.fade = false; p.drag = 0.5;
+          if (fall) { p.x = rnd() * W; p.y = H * (0.25 + rnd() * 0.75); p.max = 5 + rnd() * 5; }
+          else { const an = rnd() * 6.28, r = rnd() * (burst ? 120 : 60) * u; p.x = px + Math.cos(an) * r; p.y = py + Math.sin(an) * r; radial(5, burst ? 60 : 25); p.max = 4 + rnd() * 4; }
+          break;
+        case "bubble":
+          p.size = (4 + rnd() * 8) * u; p.swayAmp = 0.7;
+          if (fall) { fromBottom(); p.vy = -(30 + rnd() * 50) * u; p.max = 4 + rnd() * 5; p.fade = false; }
+          else { up(burst ? 2.4 : 0.8, burst ? 60 : 30, burst ? 180 : 80); p.drag = burst ? 1 : 0.2; p.g = -15 * u; p.max = 2.5 + rnd() * 2.5; }
+          break;
+        case "confetti":
+          p.size = (6 + rnd() * 5) * u; p.vr = (rnd() - 0.5) * 10;
+          if (fall) { fromTop(); p.vx = (rnd() - 0.5) * 60 * u; p.vy = (60 + rnd() * 60) * u; p.max = 30; p.fade = false; p.swayAmp = 0.6; }
+          else { up(burst ? 1.6 : 1.0, burst ? 300 : 200, burst ? 700 : 450); p.drag = burst ? 1.8 : 1.5; p.g = (burst ? 420 : 380) * u; p.max = 2.4 + rnd() * 1.5; }
+          break;
       }
       pfx.list.push(p);
+    }
+    function splash(p) {
+      const u = Math.max(0.7, Math.min(pfx.w, pfx.h) / 420), n = 3 + ((Math.random() * 3) | 0);
+      for (let i = 0; i < n; i++) pfx.list.push({ shape: "drip", color: p.color, x: p.x, y: p.ground, vx: (Math.random() - 0.5) * 160 * u, vy: -(80 + Math.random() * 140) * u,
+        g: 900 * u, drag: 0, life: 0, max: 0.45 + Math.random() * 0.2, size: p.size * 0.45, rot: 0, vr: 0, sway: 0, swayAmp: 0, fade: true, alphaMul: 1, grow: 0, wander: 0 });
+    }
+
+    function rgba(hex, al) {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+      if (!m) return hex;
+      const n = parseInt(m[1], 16);
+      return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${al})`;
+    }
+    function soft(ctx, r, color, a, dense) {
+      const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      if (dense) { gr.addColorStop(0, rgba(color, 1)); gr.addColorStop(0.35, rgba(color, 0.85)); gr.addColorStop(0.7, rgba(color, 0.35)); gr.addColorStop(1, rgba(color, 0)); }
+      else { gr.addColorStop(0, color); gr.addColorStop(1, "rgba(255,255,255,0)"); }
+      ctx.globalAlpha = a; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.29); ctx.fill();
     }
     function drawP(ctx, p, a) {
       const s = p.size;
@@ -517,53 +600,84 @@
           ctx.beginPath(); ctx.moveTo(0, -s);
           ctx.quadraticCurveTo(s * 0.95, -s * 0.15, s * 0.15, s); ctx.lineTo(0, s * 0.75); ctx.lineTo(-s * 0.15, s);
           ctx.quadraticCurveTo(-s * 0.95, -s * 0.15, 0, -s); ctx.fill(); break;
+        case "leaf":
+          ctx.rotate(p.rot); ctx.scale(1, 0.5 + 0.5 * Math.sin(p.sway * 1.3));
+          ctx.beginPath(); ctx.moveTo(0, -s); ctx.quadraticCurveTo(s * 0.85, 0, 0, s); ctx.quadraticCurveTo(-s * 0.85, 0, 0, -s); ctx.fill();
+          ctx.strokeStyle = "rgba(60,30,10,.45)"; ctx.lineWidth = Math.max(0.8, s * 0.08); ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(0, s * 1.25); ctx.stroke(); break;
         case "heart":
           ctx.rotate(Math.sin(p.sway) * 0.4); ctx.scale(s / 10, s / 10);
           ctx.beginPath(); ctx.moveTo(0, 3);
-          ctx.bezierCurveTo(-10, -4, -5, -11, 0, -5); ctx.bezierCurveTo(5, -11, 10, -4, 0, 3);
-          ctx.lineTo(0, 7); ctx.bezierCurveTo(0, 7, 0, 7, 0, 3); ctx.fill(); break;
+          ctx.bezierCurveTo(-10, -4, -5, -11, 0, -5); ctx.bezierCurveTo(5, -11, 10, -4, 0, 3); ctx.lineTo(0, 7); ctx.fill(); break;
         case "sparkle": {
           ctx.rotate(p.rot * 0.3); const k = s * (0.7 + 0.3 * Math.sin(p.life * 12));
           ctx.beginPath();
           for (let i = 0; i < 8; i++) { const r = i % 2 ? k * 0.22 : k; const an = (i * Math.PI) / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
           ctx.closePath(); ctx.fill(); break;
         }
-        case "steam": {
-          const r = s * (1 + (p.life / p.max) * p.grow);
-          const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-          gr.addColorStop(0, p.color); gr.addColorStop(1, "rgba(255,255,255,0)");
-          ctx.globalAlpha = a * 0.2 * Math.min(1, p.life / 0.5); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.29); ctx.fill(); break;
+        case "rain": case "storm":
+          ctx.lineWidth = p.shape === "storm" ? 1.7 : 1.4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-p.vx * 0.025, -p.vy * 0.025); ctx.stroke(); break;
+        case "steam":
+          soft(ctx, s * (1 + (p.life / p.max) * p.grow), p.color, a * p.alphaMul * Math.min(1, p.life / 0.5)); break;
+        case "smoke":
+          soft(ctx, s * (1 + (p.life / p.max) * p.grow), p.color, a * p.alphaMul * Math.min(1, p.life / 0.4), true); break;
+        case "fog":
+          ctx.scale(1, 0.32); soft(ctx, s, p.color, a * p.alphaMul, true); break;
+        case "drip": {
+          const st = 1 + Math.min(1, Math.abs(p.vy) / 700) * 0.7;
+          ctx.scale(1, st);
+          ctx.beginPath(); ctx.moveTo(0, -s * 2.1);
+          ctx.bezierCurveTo(s * 1.1, -s * 0.5, s, s, 0, s); ctx.bezierCurveTo(-s, s, -s * 1.1, -s * 0.5, 0, -s * 2.1); ctx.fill();
+          ctx.globalAlpha = a * 0.7; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(-s * 0.35, -s * 0.1, s * 0.28, 0, 6.29); ctx.fill(); break;
         }
-        case "rain":
-          ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-p.vx * 0.025, -p.vy * 0.025); ctx.stroke(); break;
-        case "snow": case "dot": default: {
-          const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, s);
-          gr.addColorStop(0, p.color); gr.addColorStop(1, "rgba(255,255,255,0)");
-          ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, s, 0, 6.29); ctx.fill();
-        }
+        case "ember": case "firefly":
+          ctx.globalCompositeOperation = "lighter";
+          soft(ctx, s * 3.4, p.color, a * 0.95);
+          ctx.globalAlpha = a; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, 0, s * 0.45, 0, 6.29); ctx.fill();
+          break;
+        case "bubble":
+          ctx.lineWidth = Math.max(1, s * 0.12); ctx.fillStyle = "rgba(255,255,255,.08)";
+          ctx.beginPath(); ctx.arc(0, 0, s, 0, 6.29); ctx.fill(); ctx.stroke();
+          ctx.globalAlpha = a * 0.8; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(-s * 0.35, -s * 0.35, s * 0.22, 0, 6.29); ctx.fill(); break;
+        case "confetti":
+          ctx.rotate(p.rot); ctx.scale(1, Math.cos(p.sway * 3)); ctx.fillRect(-s / 2, -s / 4, s, s / 2); break;
+        case "snow": case "dot": default:
+          soft(ctx, s, p.color, a);
       }
       ctx.restore();
+      ctx.globalCompositeOperation = "source-over";
     }
     function tick(now) {
-      if (dead) return;
+      if (dead || !R.isConnected) { pfx.raf = 0; return; }
       const dt = Math.min(0.05, (now - pfx.last) / 1000); pfx.last = now;
       const e = pfx.emit;
       if (e) {
-        const rate = (e.mode === "fall" ? (e.shape === "rain" ? 70 : e.shape === "sparkle" || e.shape === "dot" ? 12 : e.shape === "steam" ? 6 : 9) : e.shape === "steam" ? 5 : 20) * e.amount;
+        const rate = (e.mode === "fall" ? RATE_FALL[e.shape] || 9 : RATE_POINT[e.shape] || 20) * e.amount;
         pfx.acc += rate * dt;
         while (pfx.acc >= 1) { spawn(e); pfx.acc--; }
+        // 폭우: 가끔 번개가 번쩍
+        if (e.shape === "storm" && now > pfx.bolt) {
+          pfx.bolt = now + 3500 + Math.random() * 5000;
+          flash("rgba(235,240,255,.85)", 320);
+          later(() => flash("rgba(235,240,255,.6)", 420), 140);
+        }
       }
       const ctx = pfx.ctx, W = pfx.w, H = pfx.h;
       ctx.setTransform(pfx.dpr, 0, 0, pfx.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
       pfx.list = pfx.list.filter((p) => {
         p.life += dt;
         if (p.drag) { const k = Math.exp(-p.drag * dt); p.vx *= k; p.vy *= k; }
-        p.vy += p.g * dt; p.sway += dt * 2.2; p.rot += p.vr * dt;
-        p.x += p.vx * dt + (p.shape === "petal" || p.shape === "snow" || p.shape === "heart" ? Math.sin(p.sway) * 0.5 : 0);
+        p.vy += p.g * dt;
+        if (p.wander) { p.vx += (Math.random() - 0.5) * p.wander * dt * 8; p.vy += (Math.random() - 0.5) * p.wander * dt * 8; }
+        p.sway += dt * 2.2; p.rot += p.vr * dt;
+        p.x += p.vx * dt + (p.swayAmp ? Math.sin(p.sway) * p.swayAmp : 0);
         p.y += p.vy * dt;
-        if (p.life > p.max || p.y > H + 40 || p.x < -80 || p.x > W + 80) return false;
-        const fadeIn = Math.min(1, p.life / 0.15);
-        const a = (p.fade ? Math.max(0, 1 - p.life / p.max) : 0.9) * fadeIn;
+        if (p.splash && p.y >= p.ground) { splash(p); return false; }
+        const m = p.size * (1 + (p.grow || 0)) + 40;
+        if (p.life > p.max || p.y > H + m || p.y < -m - 40 || p.x < -m || p.x > W + m) return false;
+        let a = p.envelope ? Math.sin(Math.PI * Math.min(1, p.life / p.max)) : p.fade ? Math.max(0, 1 - p.life / p.max) : 0.9;
+        a *= Math.min(1, p.life / 0.15);
+        if (p.blink) a *= 0.35 + 0.65 * Math.max(0, Math.sin(p.life * 2.5 + p.rot * 3));
+        if (p.flicker) a *= 0.7 + 0.3 * Math.random();
         drawP(ctx, p, a);
         return true;
       });
@@ -916,6 +1030,7 @@
     el.viewer.onclick = () => (el.viewer.hidden = true);
     if (P.gallery === false) q('[data-a="gallery"]').hidden = true;
     if (opts.onExit) R.querySelectorAll('[data-a="exit"]').forEach((b) => (b.hidden = false));
+    if (opts.preview) R.classList.add("vn-preview"); // 창작기 미리보기: 메뉴와 대사 창 숨김
 
     // ---------- 시작 ----------
     q(".vn-title h1").textContent = P.title || "제목 없음";

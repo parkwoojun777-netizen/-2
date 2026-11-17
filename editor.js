@@ -152,7 +152,7 @@
     if:     { label: "조건 분기",   desc: "변수에 따라 이동" },
     goto:   { label: "장면 이동",   desc: "다른 장면으로" },
     fx:     { label: "효과",        desc: "흔들기 · 번쩍 · 암전" },
-    particles: { label: "입자 효과", desc: "벚꽃·눈·반짝이·하트·수증기 (색 지정)" },
+    particles: { label: "입자 효과", desc: "벚꽃·비·안개·연기·물방울·불티 등 16가지" },
     tint:   { label: "화면 색감",   desc: "회상·흑백·밤·노을·꿈" },
     wait:   { label: "잠깐 멈춤",   desc: "몇 초 쉬어요" },
     minigame: { label: "미니게임",  desc: "그림 속 오브젝트를 골라 변수 바꾸기" },
@@ -215,8 +215,24 @@
   }
   const targetName = (t) => (t === "bg" ? "배경" : t === "cg" ? "이벤트 그림" : `${charName(t)} 표정`);
 
-  const PSHAPE = { petal: "🌸 벚꽃잎", snow: "❄ 눈", sparkle: "✨ 반짝이", heart: "💗 하트", rain: "🌧 비", dot: "● 빛 알갱이", steam: "♨ 수증기" };
-  const PCOLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff", steam: "#ffffff" };
+  const PSHAPE = {
+    petal: "🌸 벚꽃잎", leaf: "🍂 낙엽", snow: "❄ 눈", rain: "🌧 비", storm: "⛈ 폭우 + 번개", drip: "💧 물방울 떨어지기",
+    fog: "🌫 안개", steam: "♨ 수증기", smoke: "💨 진한 연기", ember: "🔥 불티 (불꽃 가루)",
+    sparkle: "✨ 반짝이", firefly: "🟡 반딧불", dot: "● 빛 알갱이", bubble: "🫧 거품 · 비눗방울", heart: "💗 하트", confetti: "🎉 꽃가루 (축하)",
+  };
+  const PCOLOR = { petal: "#ffb7c5", snow: "#ffffff", sparkle: "#fff3a8", heart: "#ff6b8b", rain: "#a8c8ff", dot: "#8fd3ff", steam: "#ffffff",
+    drip: "#9fd4ff", smoke: "#3c3c44", fog: "#dfe6ee", storm: "#b8c8e8", ember: "#ff8a3d", leaf: "#d9822b", firefly: "#d8ff7a", bubble: "#bfefff", confetti: "#ff5d8f" };
+  const MULTI = { leaf: true, confetti: true }; // 기본 색이면 여러 색이 섞여요
+  const PTIP = {
+    drip: "'한 지점에서 퍼져 나오기'로 고르면 그 지점(천장, 수도꼭지)에서 물이 똑똑 떨어지고 바닥에서 튀어요.",
+    storm: "화면 전체로 쓰면 가끔 번개가 번쩍여요. [화면 색감] '밤'과 같이 쓰면 잘 어울려요.",
+    fog: "화면 전체로 쓰면 안개가 천천히 옆으로 흘러가요. 진하게 하려면 양을 '많이'로.",
+    smoke: "검은 연기예요. 색을 밝게 바꾸면 흰 연기·먼지 구름이 돼요. '펑! 터지기'는 폭발 연기.",
+    ember: "모닥불이나 불난 장면에 좋아요. 아래쪽 지점에서 '퍼져 나오기'로 써 보세요.",
+    firefly: "밤 장면에서 [화면 색감] '밤'과 같이 쓰면 예뻐요.",
+    confetti: "'펑! 터지기'로 쓰면 폭죽처럼 위로 터졌다가 떨어져요.",
+    steam: "찻잔이나 목욕탕 장면에서 컵 위 · 화면 아래쪽에 두세요.",
+  };
   const PMODE = { fall: "화면 전체에 흩날리기 (계속)", spread: "한 지점에서 퍼져 나오기 (계속)", burst: "한 지점에서 펑! 터지기 (한 번)" };
   const TINTS = { "": "원래대로", sepia: "회상 (세피아)", gray: "흑백", night: "밤", sunset: "노을", dream: "꿈 (뿌옇게)" };
 
@@ -242,7 +258,7 @@
       case "fx": return { fx: b.shake ? "shake" : b.flash ? "flash:" + b.flash : "fade:" + b.fade };
       case "end": return { name: b.end };
       case "particles": return b.particles === "off" ? { shape: "off", mode: "fall", color: PCOLOR.petal, x: 50, y: 40, amount: 2 }
-        : { shape: b.particles, mode: b.mode || "fall", color: b.color || PCOLOR[b.particles] || "#ffffff", x: b.x == null ? 50 : b.x, y: b.y == null ? 40 : b.y, amount: b.amount || 2 };
+        : { shape: b.particles, mode: b.mode || "fall", color: (b.color || PCOLOR[b.particles] || "#ffffff").toLowerCase(), x: b.x == null ? 50 : b.x, y: b.y == null ? 40 : b.y, amount: b.amount || 2 };
       case "tint": return { tint: b.tint || "" };
       case "varimg": return {
         target: b.varImage, fit: b.fit || "contain",
@@ -528,7 +544,11 @@
     if (k === "raw") return rawSheet(i);
     const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
     const codeLine = h("code", { class: "hint", style: { whiteSpace: "pre-wrap", wordBreak: "break-all" } });
-    const refreshCode = () => { codeLine.textContent = "코드: " + inlineCode(fromForm(k, f)); };
+    let pvT;
+    const refreshCode = () => {
+      codeLine.textContent = "코드: " + inlineCode(fromForm(k, f));
+      if (f._preview) { clearTimeout(pvT); pvT = setTimeout(() => f._preview && f._preview(), 300); } // 효과 미리보기 새로 고침
+    };
     const draw = () => { body.innerHTML = ""; put(body, formFor(k, f, draw, refreshCode)); refreshCode(); };
     draw();
     const commit = () => {
@@ -644,19 +664,14 @@
         const shapes = Object.assign({}, PSHAPE, { off: "⏹ 입자 효과 끄기" });
         const parts = [field("모양", h("select", { onchange: (e) => { const old = f.shape; f.shape = e.target.value; if (PCOLOR[f.shape] && f.color.toLowerCase() === (PCOLOR[old] || "").toLowerCase()) f.color = PCOLOR[f.shape]; redraw(); } },
           Object.entries(shapes).map(([v, t]) => h("option", { value: v, selected: v === f.shape }, t))))];
-        if (f.shape === "off") return [...parts, h("p", { class: "hint" }, "계속 나오던 입자를 멈춰요. 이미 나온 입자는 자연스럽게 사라져요.")];
-        parts.push(
-          field("나오는 방식", sel("mode", PMODE, true)),
-          h("div", { class: "row" },
-            h("label", { class: "f", style: { flex: "none" } }, "색", h("input", { type: "color", value: f.color, oninput: (e) => { f.color = e.target.value; upd(); dot && (dot.style.background = f.color); } })),
-            h("button", { class: "btn", style: { alignSelf: "flex-end" }, onclick: () => { f.color = PCOLOR[f.shape]; redraw(); } }, "기본 색"),
-            field("양", sel("amount", { 1: "적게", 2: "보통", 3: "많이" }))));
-        let dot = null;
-        if (f.mode !== "fall") {
-          // 터치로 위치 고르기: 화면 모양 상자를 누른 곳이 입자가 나오는 지점
-          dot = h("div", { class: "pos-dot", style: { left: f.x + "%", top: f.y + "%", background: f.color } });
-          const bgRef = proj.backgrounds[Object.keys(proj.backgrounds)[0]];
-          const box = h("div", { class: "pos-box", style: { backgroundImage: bgRef ? `url("${imgSrc(bgRef)}")` : "" } }, dot);
+        if (f.shape === "off") { f._preview = null; return [...parts, h("p", { class: "hint" }, "계속 나오던 입자를 멈춰요. 이미 나온 입자는 자연스럽게 사라져요.")]; }
+        const point = f.mode !== "fall";
+        // 미리보기 + 위치 고르기: 실제 게임 엔진으로 효과를 보여주고, 누른 곳이 입자가 나오는 지점이 돼요
+        const stage = h("div", { class: "pfx-stage" });
+        const dot = point ? h("div", { class: "pos-dot", style: { left: f.x + "%", top: f.y + "%", background: f.color } }) : null;
+        const box = h("div", { class: "pos-box pfx-box" + (point ? "" : " nopick") }, stage, dot);
+        const posTxt = h("span", { class: "hint" }, point ? `가로 ${Math.round(f.x)}% · 세로 ${Math.round(f.y)}%` : "화면 전체에 나와요");
+        if (point) {
           const setFrom = (ev) => {
             const r = box.getBoundingClientRect();
             f.x = Math.max(0, Math.min(100, ((ev.clientX - r.left) / r.width) * 100));
@@ -665,12 +680,31 @@
           };
           box.addEventListener("pointerdown", (ev) => { box.setPointerCapture(ev.pointerId); setFrom(ev); });
           box.addEventListener("pointermove", (ev) => { if (ev.buttons || ev.pointerType === "touch") setFrom(ev); });
-          const posTxt = h("span", { class: "hint" }, `가로 ${Math.round(f.x)}% · 세로 ${Math.round(f.y)}%`);
-          parts.push(h("label", { class: "f" }, "어디서 나올까요? (화면을 눌러 고르세요)", box, posTxt));
-          const presets = { "캐릭터 얼굴": [50, 35], "가운데": [50, 50], "아래 (김 오르기)": [50, 95], "위쪽": [50, 10], "왼쪽 위": [15, 15], "오른쪽 위": [85, 15], "아래쪽": [50, 85] };
+        }
+        let inst = null;
+        f._preview = () => {
+          if (inst) inst.destroy();
+          if (!stage.isConnected) return;
+          const bgName = Object.keys(proj.backgrounds)[0];
+          const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images,
+            story: { a: [bgName ? { bg: bgName } : { wait: 1 }, fromForm("particles", f), { wait: 2000000000 }] } };
+          inst = VN.mount(stage, P, { startScene: "a", preview: true });
+        };
+        parts.push(
+          field("나오는 방식", sel("mode", PMODE, true)),
+          h("label", { class: "f" }, point ? "미리보기 — 누른 곳에서 나와요" : "미리보기", box, h("div", { class: "row" }, posTxt,
+            h("button", { class: "btn", style: { marginLeft: "auto", padding: "5px 10px", fontSize: "13px" }, onclick: (e) => { e.preventDefault(); f._preview && f._preview(); } }, "↻ 다시 보기"))),
+          h("div", { class: "row" },
+            h("label", { class: "f", style: { flex: "none" } }, "색", h("input", { type: "color", value: f.color, oninput: (e) => { f.color = e.target.value; if (dot) dot.style.background = f.color; upd(); } })),
+            h("button", { class: "btn", style: { alignSelf: "flex-end" }, onclick: () => { f.color = PCOLOR[f.shape]; redraw(); } }, "기본 색"),
+            field("양", sel("amount", { 1: "적게", 2: "보통", 3: "많이" }))),
+          MULTI[f.shape] ? h("p", { class: "hint" }, "기본 색이면 여러 색이 섞여서 나와요.") : null);
+        if (point) {
+          const presets = { "캐릭터 얼굴": [50, 35], "가운데": [50, 50], "위쪽 (천장)": [50, 5], "아래 (바닥)": [50, 95], "왼쪽 위": [15, 15], "오른쪽 위": [85, 15] };
           parts.push(h("div", { class: "row" }, Object.entries(presets).map(([t, [x, y]]) => h("button", { class: "btn", style: { padding: "6px 10px", fontSize: "13px" }, onclick: () => { f.x = x; f.y = y; redraw(); } }, t))));
         }
-        parts.push(h("p", { class: "hint" }, f.mode === "burst" ? "한 번 터지고 끝나요." : "끌 때까지 계속 나와요. 멈추려면 [입자 효과] 블록에서 '끄기'를 넣어 주세요."));
+        if (PTIP[f.shape]) parts.push(h("p", { class: "hint" }, "💡 " + PTIP[f.shape]));
+        parts.push(h("p", { class: "hint" }, f.mode === "burst" ? "한 번 나오고 끝나요." : "끌 때까지 계속 나와요. 멈추려면 [입자 효과] 블록에서 '끄기'를 넣어 주세요."));
         return parts;
       }
       case "tint": return [field("화면 색감", sel("tint", TINTS)), h("p", { class: "hint" }, "배경과 캐릭터의 색을 바꿔요. 대사 창은 그대로예요. 되돌리려면 '원래대로'를 넣어 주세요.")];
@@ -1423,7 +1457,10 @@ VN.mount(document.getElementById("game"), PROJECT);<\/script>
     const f = $("#sheet-foot"); f.innerHTML = ""; if (foot) put(f, foot);
     $("#sheet-wrap").hidden = false;
   }
-  function closeSheet() { $("#sheet-wrap").hidden = true; }
+  function closeSheet() {
+    $("#sheet-wrap").hidden = true;
+    $("#sheet-body").innerHTML = ""; // 효과 미리보기 같은 움직이는 것도 같이 멈춰요
+  }
   $("#sheet-x").onclick = closeSheet;
   $("#sheet-wrap").addEventListener("click", (e) => { if (e.target.id === "sheet-wrap") closeSheet(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet-wrap").hidden) closeSheet(); });
