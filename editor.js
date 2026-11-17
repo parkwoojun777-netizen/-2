@@ -81,7 +81,7 @@
   function blankProject() {
     return {
       title: "새 비주얼 노벨", subtitle: "", titleBg: "", start: "시작",
-      vars: {}, gauges: {}, effects: {}, backgrounds: {}, cgs: {}, items: {}, sounds: {}, characters: {}, nameColors: { 나: "#ffd27a" },
+      vars: {}, gauges: {}, watches: [], effects: {}, backgrounds: {}, cgs: {}, items: {}, sounds: {}, characters: {}, nameColors: { 나: "#ffd27a" },
       story: { 시작: ["여기에 첫 문장을 써 보세요.", { end: "THE END" }] },
       memories: [], gallery: true,
       images: {},
@@ -148,6 +148,7 @@
     sound:  { label: "효과음",      desc: "소리 한 번 재생" },
     bgm:    { label: "배경음악",    desc: "음악 틀기 · 바꾸기 · 끄기" },
     act:    { label: "캐릭터 움직임", desc: "떨기 · 깡총 · 아래로 · 다가오기 등" },
+    signal: { label: "시그널 보내기", desc: "⚡ 이름 붙인 블록 묶음 실행" },
     varimg: { label: "변수 그림",   desc: "변수에 따라 다른 그림" },
     show:   { label: "캐릭터 등장", desc: "등장 / 표정 / 위치" },
     hide:   { label: "캐릭터 퇴장", desc: "화면에서 사라져요" },
@@ -174,6 +175,7 @@
     if (Array.isArray(b.cgSeq)) return "cgseq";
     if (b.sound !== undefined) return "sound";
     if (b.bgm !== undefined) return "bgm";
+    if (b.signal !== undefined) return "signal";
     if (b.act !== undefined && b.say === undefined) return "act";
     if (b.minigame) return b.minigame === "pick" ? "minigame" : "raw"; // 예전 미니게임은 코드 블록으로 보여줘요
     if (b.particles !== undefined) return "particles";
@@ -274,6 +276,7 @@
       case "sound": return { sound: b.sound, volume: b.volume == null ? 1 : b.volume };
       case "bgm": return { bgm: b.bgm || "", volume: b.volume == null ? 1 : b.volume, fade: b.fade == null ? 1 : b.fade };
       case "act": return { id: b.act, motion: b.motion || "hop" };
+      case "signal": return { name: b.signal };
       case "cgseq": return { fit: b.fit || "contain", after: b.after || "hide", steps: b.cgSeq.map((st) => Object.assign(newStep(), clone(st))) };
       case "gauge": return { name: b.gauge, show: b.show !== false };
       case "varimg": return {
@@ -287,7 +290,7 @@
           look: o.hidden ? "hidden" : o.item ? "item" : "marker", item: o.item || "", text: o.text || "", say: o.say || "", goto: o.goto || "", once: o.once !== false,
         }, o.set ? parseSetEntry(o.set) : { var: "", op: "+", val: "1" })),
         active: 0 };
-      case "choice": return { options: b.choice.map((o) => Object.assign({ text: o.text, goto: o.goto || "" }, o.set ? parseSetEntry(o.set) : { var: "", op: "+", val: "1" }, { if: o.if || "" })) };
+      case "choice": return { options: b.choice.map((o) => Object.assign({ text: o.text, goto: o.goto || "" }, o.set ? parseSetEntry(o.set) : { var: "", op: "+", val: "1" }, { if: o.if || "", signal: o.signal || "" })) };
       default: return { raw: b };
     }
   }
@@ -330,6 +333,7 @@
       case "sound": return +f.volume === 1 ? { sound: f.sound } : { sound: f.sound, volume: +f.volume };
       case "bgm": { const o = { bgm: f.bgm }; if (f.bgm && +f.volume !== 1) o.volume = +f.volume; if (+f.fade !== 1) o.fade = +f.fade; return o; }
       case "act": return { act: f.id, motion: f.motion };
+      case "signal": return { signal: f.name };
       case "cgseq": {
         const o = { cgSeq: f.steps.map((st) => { const r = {}; for (const k of ["image", "say", "text", "sound", "fx", "particles"]) if (st[k]) r[k] = st[k]; return r; }) };
         if (f.fit === "cover") o.fit = "cover";
@@ -366,7 +370,7 @@
         if (f.score) o.score = f.score;
         return o;
       }
-      case "choice": return { choice: f.options.map((o) => { const r = { text: o.text || "…" }; if (o.goto) r.goto = o.goto; const s = buildSet(o); if (s) r.set = s; if (o.if) r.if = o.if; return r; }) };
+      case "choice": return { choice: f.options.map((o) => { const r = { text: o.text || "…" }; if (o.goto) r.goto = o.goto; const s = buildSet(o); if (s) r.set = s; if (o.if) r.if = o.if; if (o.signal) r.signal = o.signal; return r; }) };
       default: return f.raw;
     }
   }
@@ -402,6 +406,7 @@
       case "sound": return { sound: Object.keys(proj.sounds)[0] || "", volume: 1 };
       case "bgm": return { bgm: Object.keys(proj.sounds)[0] || "", volume: 1, fade: 1 };
       case "act": return { id: Object.keys(proj.characters)[0] || "all", motion: "hop" };
+      case "signal": return { name: sigNames()[0] || "" };
       case "cgseq": { const c = Object.keys(proj.cgs)[0] || ""; return { fit: "contain", after: "hide", steps: [Object.assign(newStep(), { image: c }), newStep()] }; }
       case "gauge": return { name: Object.keys(proj.gauges)[0] || "all", show: true };
       case "choice": return { options: [{ text: "", goto: "", var: "", op: "+", val: "1", if: "" }, { text: "", goto: "", var: "", op: "+", val: "1", if: "" }] };
@@ -433,6 +438,7 @@
       case "sound": return `🔊 ${f.sound || "(없음)"}${+f.volume !== 1 ? ` · 크기 ${Math.round(f.volume * 100)}%` : ""}`;
       case "bgm": return f.bgm ? `🎵 ${f.bgm} 틀기${+f.volume !== 1 ? ` · 크기 ${Math.round(f.volume * 100)}%` : ""}${+f.fade ? ` · ${f.fade}초 동안 서서히` : ""}` : `🎵 음악 끄기${+f.fade ? ` (${f.fade}초 동안 작아지며)` : ""}`;
       case "act": return `🕺 ${charName(f.id)} · ${MOTION_NAME[f.motion] || f.motion}`;
+      case "signal": return `⚡ 「${f.name || "?"}」 보내기`;
       case "cgseq": return [h("div", {}, `🎞 CG 넘기기 · 탭 ${f.steps.length}번`),
         f.steps.slice(0, 4).map((st, j) => h("div", { class: "opt" }, `${j + 1}. ${st.image ? "🖼 " + st.image + " " : ""}${st.sound ? "🔊 " : ""}${st.fx || st.particles ? "✨ " : ""}${st.text ? (st.say ? st.say + ": " : "") + st.text.slice(0, 24) : "(탭)"}`)),
         f.steps.length > 4 ? h("div", { class: "opt" }, `… ${f.steps.length - 4}단계 더`) : null];
@@ -498,6 +504,7 @@
     const S = proj.story;
     const scn = (n) => S[n] !== undefined;
     if (!scn(proj.start)) out.push(`시작 장면 "${proj.start}" 이 없어요.`);
+    (proj.watches || []).forEach((w) => { if (!S[SIG + w.signal]) out.push(`자동 조건 "${w.if}" 의 시그널 "${w.signal}" 이 없어요.`); });
     for (const [name, list] of Object.entries(S)) {
       walk(list, (b, l, i, lb) => {
         const at = `「${name}」 ${lb}번`;
@@ -520,6 +527,8 @@
         if (k === "bg" && !proj.backgrounds[f.bg]) out.push(`${at}: 배경 "${f.bg}" 이 없어요.`);
         if (k === "cg" && f.cg && !proj.cgs[f.cg]) out.push(`${at}: 이벤트 그림 "${f.cg}" 이 없어요.`);
         if (k === "sound" && !proj.sounds[f.sound]) out.push(`${at}: 효과음 "${f.sound}" 이 없어요.`);
+        if (k === "signal" && !proj.story[SIG + f.name]) out.push(`${at}: 시그널 "${f.name}" 이 없어요.`);
+        if (k === "choice") f.options.forEach((o) => o.signal && !proj.story[SIG + o.signal] && out.push(`${at}: 선택지 "${o.text}" 의 시그널 "${o.signal}" 이 없어요.`));
         if (k === "bgm" && f.bgm && !proj.sounds[f.bgm]) out.push(`${at}: 배경음악 "${f.bgm}" 이 없어요.`);
         if (k === "act" && f.id !== "all" && !proj.characters[f.id]) out.push(`${at}: 캐릭터 "${f.id}" 이 없어요.`);
         if (k === "cgseq") f.steps.forEach((st, j) => {
@@ -535,7 +544,7 @@
       const last = flat[flat.length - 1];
       const lk = last === undefined ? null : kindOf(last);
       const closed = lk === "goto" || lk === "end" || (lk === "choice" && toForm(last).options.every((o) => o.goto)) || (lk === "if" && toForm(last).else);
-      if (!closed) out.push(`「${name}」 의 마지막에 장면 이동이나 엔딩이 없어요. (끝까지 가면 멈춰요)`);
+      if (!closed && !isSig(name)) out.push(`「${name}」 의 마지막에 장면 이동이나 엔딩이 없어요. (끝까지 가면 멈춰요)`);
     }
     return out;
   }
@@ -565,10 +574,21 @@
   function renderStory(w) {
     if (!proj.story[scene]) scene = proj.start in proj.story ? proj.start : Object.keys(proj.story)[0];
     if (mapMode) return renderMap(w);
-    const names = Object.keys(proj.story);
+    const names = Object.keys(proj.story).filter((n) => !isSig(n));
+    const sigs = sigNames();
     const sel = h("select", { "aria-label": "장면 고르기", onchange: (e) => { scene = e.target.value; stopSelecting(); render(); } },
-      names.map((n) => h("option", { value: n, selected: n === scene }, (n === proj.start ? "⭐ " : "") + n + (proj.memories.some((m) => m.scene === n) ? "  🎞" : ""))));
-    w.append(
+      h("optgroup", { label: "장면" }, names.map((n) => h("option", { value: n, selected: n === scene }, (n === proj.start ? "⭐ " : "") + n + (proj.memories.some((m) => m.scene === n) ? "  🎞" : "")))),
+      sigs.length ? h("optgroup", { label: "⚡ 시그널" }, sigs.map((n) => h("option", { value: SIG + n, selected: SIG + n === scene }, "⚡ " + n))) : null);
+    if (isSig(scene)) {
+      const nm = scene.slice(SIG.length);
+      w.append(
+        h("div", { class: "scene-bar" }, sel),
+        h("div", { class: "sig-banner" }, h("b", {}, `⚡ 시그널 「${nm}」`), h("span", {}, `보내면 아래 블록이 실행되고, 끝나면 보낸 곳으로 돌아가요. (보내는 곳 ${signalUses(nm)}곳)`)),
+        h("div", { class: "scene-tools" },
+          h("button", { class: "btn", onclick: () => signalSheet(nm) }, "⚡ 시그널 설정 · 자동 조건 · 삭제"),
+          h("button", { class: "btn", onclick: () => signalSheet(null) }, "+ 새 시그널"),
+          h("button", { class: "btn" + (selecting ? " primary" : ""), onclick: () => { if (selecting) stopSelecting(); else selecting = true; render(); } }, selecting ? "✓ 선택 끝내기" : "☑ 여러 개 선택")));
+    } else w.append(
       h("div", { class: "scene-bar" }, sel),
       h("div", { class: "scene-tools" },
         h("button", { class: "btn", onclick: () => sceneSheet(null) }, "+ 새 장면"),
@@ -578,7 +598,8 @@
         h("button", { class: "btn" + (selecting ? " primary" : ""), onclick: () => { if (selecting) stopSelecting(); else selecting = true; render(); } },
           selecting ? "✓ 선택 끝내기" : "☑ 여러 개 선택 (복사 · 묶기)"),
         h("button", { class: "btn", onclick: () => branchSheet("choice") }, "🔀 분기 만들기"),
-        h("button", { class: "btn", onclick: () => { stopSelecting(); mapMode = true; render(); } }, "🗺 장면 지도")
+        h("button", { class: "btn", onclick: () => { stopSelecting(); mapMode = true; render(); } }, "🗺 장면 지도"),
+        h("button", { class: "btn", onclick: () => signalSheet(null) }, "⚡ 새 시그널")
       )
     );
     const list = proj.story[scene];
@@ -1088,6 +1109,93 @@
     toast("한 번 더 누르면 멈춰요");
   }
 
+  // ===== ⚡ 시그널 =====
+  // 시그널은 story 안에 "⚡이름" 으로 저장되는 블록 묶음이에요. [시그널 보내기] · 선택지 · 자동 조건 · 게이지 표시점으로 보내요.
+  const SIG = "⚡";
+  const isSig = (n) => typeof n === "string" && n.startsWith(SIG);
+  const sigNames = () => Object.keys(proj.story).filter(isSig).map((n) => n.slice(SIG.length));
+  function signalSelect(val, on, emptyLabel) {
+    const names = sigNames();
+    return h("select", { onchange: (e) => on(e.target.value) },
+      emptyLabel ? h("option", { value: "", selected: !val }, emptyLabel) : null,
+      names.map((n) => h("option", { value: n, selected: n === val }, "⚡ " + n)),
+      val && !names.includes(val) ? h("option", { value: val, selected: true }, `⚠ ${val} (없음)`) : null);
+  }
+  function signalUses(name) {
+    let n = 0;
+    eachBlock((b) => {
+      if (!b || typeof b !== "object") return;
+      if (b.signal === name) n++;
+      if (b.choice) b.choice.forEach((o) => { if (o.signal === name) n++; });
+    });
+    n += (proj.watches || []).filter((w) => w.signal === name).length;
+    Object.values(proj.gauges).forEach((g) => (g.markers || []).forEach((m) => { if (m.signal === name) n++; }));
+    return n;
+  }
+  function renameSignal(from, to) {
+    const S = {};
+    for (const [k, l] of Object.entries(proj.story)) S[k === SIG + from ? SIG + to : k] = l;
+    proj.story = S;
+    eachBlock((b) => {
+      if (!b || typeof b !== "object") return;
+      if (b.signal === from) b.signal = to;
+      if (b.choice) b.choice.forEach((o) => { if (o.signal === from) o.signal = to; });
+    });
+    (proj.watches || []).forEach((w) => { if (w.signal === from) w.signal = to; });
+    Object.values(proj.gauges).forEach((g) => (g.markers || []).forEach((m) => { if (m.signal === from) m.signal = to; }));
+  }
+  function signalSheet(name) {
+    const isNew = name == null;
+    const nameIn = h("input", { type: "text", value: isNew ? "" : name, placeholder: "예: 호감도 최고, 깜짝 이벤트" });
+    const err = h("p", { class: "hint", style: { color: "var(--danger)" } });
+    // 이 시그널을 자동으로 보내는 조건들
+    const conds = isNew ? [] : (proj.watches || []).filter((w) => w.signal === name).map((w) => Object.assign(parseCond(w.if), { once: !!w.once }));
+    const condBox = h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } });
+    const drawConds = () => {
+      condBox.innerHTML = "";
+      put(condBox,
+        conds.map((c, j) => h("div", { class: "opt-card" },
+          h("div", { class: "grid3" },
+            field("변수", varsSelect(c.var, (v) => (c.var = v))),
+            field("비교", h("select", { onchange: (e) => (c.op = e.target.value) }, [">=", ">", "==", "!=", "<=", "<"].map((x) => h("option", { value: x, selected: c.op === x }, x)))),
+            field("값", h("input", { type: "text", value: c.val, oninput: (e) => (c.val = e.target.value) }))),
+          h("div", { class: "row" },
+            h("label", { class: "check", style: { flex: 1 } }, h("input", { type: "checkbox", checked: c.once, onchange: (e) => (c.once = e.target.checked) }), "처음 한 번만"),
+            h("button", { class: "btn danger", style: { padding: "5px 10px" }, onclick: () => { conds.splice(j, 1); drawConds(); } }, "빼기")))),
+        Object.keys(proj.vars).length
+          ? h("button", { class: "btn dashed wide", onclick: () => { conds.push({ var: Object.keys(proj.vars)[0], op: ">=", val: "5", once: true }); drawConds(); } }, "+ 조건 추가")
+          : h("p", { class: "hint" }, "변수가 없어요. [변수] 탭에서 만들면 조건을 넣을 수 있어요."));
+    };
+    drawConds();
+    const foot = [h("button", { class: "btn primary grow", onclick: () => {
+      const v = nameIn.value.trim();
+      if (!v) return (err.textContent = "이름을 써 주세요.");
+      if (v !== name && proj.story[SIG + v]) return (err.textContent = "같은 이름의 시그널이 있어요.");
+      if (isNew) proj.story[SIG + v] = [];
+      else if (v !== name) renameSignal(name, v);
+      proj.watches = (proj.watches || []).filter((w) => w.signal !== v && w.signal !== name);
+      conds.filter((c) => c.var).forEach((c) => proj.watches.push(Object.assign({ if: `${c.var} ${c.op} ${c.val}`, signal: v }, c.once ? { once: true } : {})));
+      scene = SIG + v; closeSheet(); changed();
+    } }, isNew ? "만들기" : "저장")];
+    if (!isNew) {
+      const del = h("button", { class: "btn danger", onclick: () => {
+        if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "정말 삭제"; return; }
+        delete proj.story[SIG + name];
+        proj.watches = (proj.watches || []).filter((w) => w.signal !== name);
+        scene = proj.start; closeSheet(); changed();
+      } }, "삭제");
+      foot.push(del);
+    }
+    openSheet(isNew ? "⚡ 새 시그널" : "⚡ 시그널 설정", [
+      h("p", { class: "hint" }, "시그널은 이름 붙인 블록 묶음이에요. 시그널을 보내면 그 블록들이 실행되고, 다 끝나면 보낸 곳으로 돌아가서 이야기가 이어져요."),
+      field("시그널 이름", nameIn), err,
+      h("b", {}, "언제 자동으로 보낼까요? (선택)"),
+      h("p", { class: "hint" }, "조건이 맞게 되는 순간 저절로 보내요. 예: 호감도가 5 이상이 되는 순간. 그 밖에 [시그널 보내기] 블록, 선택지, 게이지 표시점에서도 보낼 수 있어요."),
+      condBox,
+      isNew ? null : h("p", { class: "hint" }, `이 시그널을 보내는 곳: ${signalUses(name)}곳`),
+    ], foot);
+  }
+
   // ===== 🔀 장면 나누기 · 분기 만들기 · 장면 지도 =====
   function uniqueScene(base) { let n = base, i = 2; while (proj.story[n]) n = `${base} ${i++}`; return n; }
 
@@ -1220,7 +1328,7 @@
     return { out, endings };
   }
   function renderMap(w) {
-    const S = proj.story, names = Object.keys(S);
+    const S = proj.story, names = Object.keys(S).filter((n) => !isSig(n));
     const info = Object.fromEntries(names.map((n) => [n, sceneLinks(S[n])]));
     // 시작 장면에서부터 몇 번 만에 닿는지로 줄을 나눠요
     const level = {}; const q = [proj.start]; if (S[proj.start]) level[proj.start] = 0;
@@ -1283,7 +1391,7 @@
   function scenesSelect(val, on, allowEmpty) {
     return h("select", { onchange: (e) => on(e.target.value) },
       allowEmpty ? h("option", { value: "", selected: !val }, allowEmpty) : null,
-      Object.keys(proj.story).map((n) => h("option", { value: n, selected: n === val }, n)),
+      Object.keys(proj.story).filter((n) => !isSig(n)).map((n) => h("option", { value: n, selected: n === val }, n)),
       val && !proj.story[val] ? h("option", { value: val, selected: true }, `⚠ ${val} (없음)`) : null);
   }
   function varsSelect(val, on, allowEmpty) {
@@ -1445,6 +1553,10 @@
         ];
       }
       case "cgseq": return seqForm(f, redraw, upd);
+      case "signal": return [
+        sigNames().length ? field("보낼 시그널", signalSelect(f.name, (v) => { f.name = v; upd(); })) : h("p", { class: "hint" }, "시그널이 아직 없어요. 스토리 탭 위의 [⚡ 새 시그널]로 먼저 만들어 주세요."),
+        h("p", { class: "hint" }, "이 블록에 오면 시그널의 블록들이 실행되고, 다 끝나면 이 블록 다음으로 이어져요. 여러 장면에서 똑같이 쓰는 연출을 한 번만 만들어 두고 불러 쓸 때 좋아요."),
+      ];
       case "bgm": {
         const opts = { "": "⏹ 음악 끄기" };
         Object.keys(proj.sounds).forEach((n) => (opts[n] = "🎵 " + n));
@@ -1603,7 +1715,8 @@
             field("변수 바꾸기 (선택)", varsSelect(o.var, (v) => { o.var = v; upd(); }, "안 바꿈")),
             field("어떻게", h("select", { onchange: (e) => { o.op = e.target.value; upd(); } }, ["+", "-", "="].map((x) => h("option", { value: x, selected: o.op === x }, x)))),
             field("값", h("input", { type: "text", value: o.val, oninput: (e) => { o.val = e.target.value; upd(); } }))),
-          field("보일 조건 (선택, 예: 호감도 >= 2)", h("input", { type: "text", value: o.if || "", placeholder: "비워 두면 항상 보여요", oninput: (e) => { o.if = e.target.value.trim(); upd(); } }))
+          field("보일 조건 (선택, 예: 호감도 >= 2)", h("input", { type: "text", value: o.if || "", placeholder: "비워 두면 항상 보여요", oninput: (e) => { o.if = e.target.value.trim(); upd(); } })),
+          sigNames().length ? field("고르면 시그널 보내기 (선택)", signalSelect(o.signal, (v) => { o.signal = v; upd(); }, "안 보냄")) : null
         ));
         return [...cards, h("button", { class: "btn dashed wide", onclick: () => { f.options.push({ text: "", goto: "", var: "", op: "+", val: "1", if: "" }); redraw(); } }, "+ 보기 추가")];
       }
@@ -1648,6 +1761,7 @@
       const v = inp.value.trim();
       if (!v) { err.textContent = "이름을 써 주세요."; return; }
       if (v !== name && proj.story[v]) { err.textContent = "같은 이름의 장면이 이미 있어요."; return; }
+      if (isSig(v)) { err.textContent = "장면 이름은 ⚡ 로 시작할 수 없어요 (시그널용이에요)."; return; }
       if (isNew) proj.story[v] = [];
       else if (v !== name) renameScene(name, v);
       scene = v; closeSheet(); changed();
@@ -1971,6 +2085,7 @@
   function renameVar(from, to) {
     const V = {}; for (const [k, v] of Object.entries(proj.vars)) V[k === from ? to : k] = v; proj.vars = V;
     if (proj.gauges[from]) { proj.gauges[to] = proj.gauges[from]; delete proj.gauges[from]; }
+    (proj.watches || []).forEach((w) => (w.if = String(w.if).replace(new RegExp("^\\s*" + from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)"), to)));
     const fixSet = (s) => { if (s && from in s) { s[to] = s[from]; delete s[from]; } };
     const fixIf = (e) => String(e).replace(new RegExp("^\\s*" + from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)"), to);
     eachBlock((b) => {
@@ -2068,6 +2183,7 @@
             field("아이콘", h("input", { type: "text", value: m.icon || "!", maxlength: "2", oninput: (e) => { m.icon = e.target.value; set("markers", g.markers); } })),
             h("label", { class: "f" }, "색", h("input", { type: "color", value: m.color || "#ffd23f", oninput: (e) => { m.color = e.target.value; set("markers", g.markers); } })),
             field("닿으면", h("select", { onchange: (e) => { m.fx = e.target.value; set("markers", g.markers); } }, Object.entries(G_FX).map(([v, t]) => h("option", { value: v, selected: (m.fx || "") === v }, t)))),
+            sigNames().length ? field("시그널", signalSelect(m.signal, (v) => { m.signal = v; set("markers", g.markers); }, "안 보냄")) : null,
             h("button", { class: "btn danger", style: { padding: "6px 10px", alignSelf: "flex-end" }, "aria-label": "표시점 빼기", onclick: () => { g.markers.splice(j, 1); set("markers", g.markers, true); } }, "✕"))),
           h("button", { class: "btn dashed", onclick: () => { g.markers = g.markers || []; g.markers.push({ at: Math.round((min + (max - min) * 0.8) * 10) / 10, icon: "!", color: "#ffd23f", fx: "" }); set("markers", g.markers, true); } }, "+ 표시점 추가")));
     };
@@ -2184,9 +2300,11 @@
         'sounds: { 띠링: "img:..." },\n\n{ cgSeq: [\n  { image: "추억1", text: "그날의 교실." },\n  { image: "추억2", sound: "띠링", fx: "flash" },\n  { say: "샬럿", text: "기억나?", particles: "별가루" },\n] }\n\n{ sound: "띠링", volume: 0.6 }'),
       L("11. 배경음악 · 캐릭터 움직임", "bgm 에 소리 이름을 쓰면 반복해서 틀고, 빈 칸 \"\" 이면 꺼요. fade 는 서서히 바뀌는 시간(초)이에요. act 는 움직일 캐릭터, motion 은 움직임이에요. 대사 블록에 act 를 넣으면 말하면서 움직여요.",
         '{ bgm: "교실의 오후", volume: 0.7, fade: 2 }\n{ bgm: "" }                                  // 음악 끄기\n\n{ act: "charlotte", motion: "tremble" }      // 덜덜 (계속)\n{ act: "charlotte", motion: "down" }         // 살짝 아래로 (자세)\n{ act: "charlotte", motion: "reset" }        // 제자리로\n{ say: "샬럿", act: "hop", text: "야호!" }'),
-      L("12. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
+      L("12. ⚡ 시그널 — 이름 붙인 블록 묶음", "story 안에 이름이 ⚡ 로 시작하는 목록을 만들면 시그널이 돼요. { signal: 이름 } 으로 보내면 그 블록들이 실행되고 끝나면 돌아와요. watches 는 '조건이 맞게 되는 순간' 저절로 보내요. 선택지와 게이지 표시점에도 signal 을 쓸 수 있어요.",
+        'story: {\n  "⚡깜짝 이벤트": [ { shake: true }, { sound: "띠링" }, "쿵!" ],\n  ...\n},\nwatches: [ { if: "호감도 >= 4", signal: "깜짝 이벤트", once: true } ],\n\n{ signal: "깜짝 이벤트" }                       // 보내기\n{ choice: [ { text: "만지기", signal: "깜짝 이벤트", goto: "다음" } ] }'),
+      L("13. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
         '{ group: "아침 인사", blocks: [\n  { bg: "classroom" },\n  "샬럿: 좋은 아침!",\n  "나: 안녕.",\n] },'),
-      L("13. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("14. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {

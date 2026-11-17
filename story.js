@@ -29,6 +29,8 @@
    { bgm: "교실의오후", fade: 2 }  /  { bgm: "" } → 배경음악 틀기 / 끄기 (반복 재생)
    { act: "charlotte", motion: "tremble" } → 캐릭터 움직임: hop nod shake jolt sway (한 번) ·
                                           tremble shiver breathe float stop (계속) · down sink up closer away tilt fade reset (자세)
+   { signal: "깜짝" }                    → ⚡ 시그널 보내기 (story 의 "⚡깜짝" 블록들이 실행되고 돌아와요)
+                                          watches: [{ if: "호감도 >= 4", signal: "…", once: true }] 로 자동 보내기
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
@@ -103,7 +105,24 @@ const PROJECT = {
     나: "#ffd27a",
   },
 
+  // 자동 시그널: 조건이 맞게 되는 순간 저절로 보내요
+  watches: [
+    { if: "호감도 >= 4", signal: "마음이 열렸다", once: true },
+  ],
+
   story: {
+    // ⚡ 시그널: 보내면 실행되고, 끝나면 보낸 곳으로 돌아가요
+    "⚡깜짝": [
+      { shake: true },
+      { sound: "띠링", volume: 0.5 },
+      { act: "all", motion: "jolt" },
+    ],
+    "⚡마음이 열렸다": [
+      { sound: "띠링" },
+      { particles: "heart", mode: "burst", x: 50, y: 35 },
+      "💗 샬럿의 마음이 활짝 열린 것 같다.",
+    ],
+
     프롤로그: [
       { bg: "classroom" },
       { bgm: "교실의오후", volume: 0.7, fade: 2 },
@@ -139,7 +158,7 @@ const PROJECT = {
     ],
     공통: [
       "그때, 열린 창문으로 바람이 훅 불어 들어왔다.",
-      { shake: true },
+      { signal: "깜짝" },
       { say: "샬럿", face: "shy", text: "앗, 필통이……!" },
       "샬럿의 물건이 교실 바닥에 흩어졌다. 하나를 주워 주자.",
       { minigame: "pick", title: "흩어진 물건 줍기", image: "classroom", picks: 1, labels: true,

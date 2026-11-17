@@ -330,7 +330,7 @@
     function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 
     function fresh(scene) {
-      return { scene: scene || P.start, index: 0, lineIndex: 0, vars: JSON.parse(JSON.stringify(P.vars || {})), bg: null, chars: {}, log: [], hud: [] };
+      return { scene: scene || P.start, index: 0, lineIndex: 0, vars: JSON.parse(JSON.stringify(P.vars || {})), bg: null, chars: {}, log: [], hud: [], stack: [], watch: {}, fired: {} };
     }
 
     function layout() {
@@ -515,6 +515,7 @@
           el.choices.hidden = true;
           S.log.push({ name: "▶", text: opt.text });
           if (opt.set) applySet(opt.set);
+          if (opt.signal && sendSignal(opt.signal, opt.goto)) { run(); return; } // 시그널을 먼저 실행하고, 끝나면 고른 장면으로
           if (opt.goto) jump(opt.goto); else run();
         };
         el.choices.appendChild(b);
@@ -548,7 +549,43 @@
       if (!STORY[scene]) return showError(`장면 "${scene}" 을(를) 찾을 수 없어요.`);
       if (replay && scene !== replay) return endReplay();
       unlock("seen", scene);
+      S.stack = []; // 다른 장면으로 가면 시그널에서 돌아올 곳은 잊어요
       S.scene = scene; S.index = 0; run();
+    }
+
+    // ---------- ⚡ 시그널 ----------
+    // 시그널 = 이름 붙인 블록 묶음 (story 안의 "⚡이름"). 보내면 그 블록들이 실행되고, 끝나면 보낸 곳으로 돌아와요.
+    const SIG = "⚡";
+    function sendSignal(name, thenGoto) {
+      const key = SIG + name;
+      if (!STORY[key]) { console.warn("없는 시그널:", name); return false; }
+      S.stack = S.stack || [];
+      if (S.stack.length > 20) { console.warn("시그널이 너무 깊게 이어져요:", name); return false; }
+      S.stack.push({ scene: S.scene, index: S.index, goto: thenGoto || null });
+      S.log.push({ name: "⚡", text: name });
+      S.scene = key; S.index = 0;
+      return true;
+    }
+    // 자동으로 보내는 조건: P.watches + 게이지 표시점의 시그널. 조건이 "거짓 → 참"이 되는 순간 보내요.
+    const WATCHES = [...(P.watches || []).filter((w) => w && w.if && w.signal)];
+    for (const [n, g] of Object.entries(P.gauges || {})) for (const m of (g && g.markers) || []) if (m && m.signal && m.at !== "" && m.at != null) WATCHES.push({ if: `${n} >= ${m.at}`, signal: m.signal, once: !!m.signalOnce });
+    const wKey = (w) => `${w.if}|${w.signal}`;
+    function primeWatches() {
+      S.watch = {}; S.fired = S.fired || {};
+      for (const w of WATCHES) S.watch[wKey(w)] = !!evalCond(w.if);
+    }
+    function checkWatches() {
+      if (!WATCHES.length) return false;
+      S.watch = S.watch || {}; S.fired = S.fired || {};
+      for (const w of WATCHES) {
+        const k = wKey(w), now = !!evalCond(w.if), was = S.watch[k];
+        S.watch[k] = now;
+        if (now && was === false && !(w.once && S.fired[k])) {
+          S.fired[k] = true;
+          if (sendSignal(w.signal)) return true;
+        }
+      }
+      return false;
     }
 
     function showError(msg) {
@@ -564,10 +601,19 @@
     function run() {
       let guard = 0;
       while (!dead) {
-        if (++guard > 5000) return showError("무한 반복이 감지됐어요. goto / 조건을 확인하세요.");
+        if (++guard > 5000) return showError("무한 반복이 감지됐어요. goto / 조건 / 시그널을 확인하세요.");
+        if (checkWatches()) continue; // 변수 조건이 막 맞았으면 그 시그널부터
         const list = STORY[S.scene];
         if (!list) return showError(`장면 "${S.scene}" 이 없어요.`);
-        if (S.index >= list.length) return showError(`장면 "${S.scene}" 이 끝났는데 다음으로 갈 곳(이동 / 엔딩)이 없어요.`);
+        if (S.index >= list.length) {
+          // 시그널이 끝나면 보낸 곳으로 돌아가요
+          if (S.stack && S.stack.length) {
+            const f = S.stack.pop();
+            if (f.goto) { if (replay && f.goto !== replay) return endReplay(); if (STORY[f.goto]) { S.stack = []; unlock("seen", f.goto); S.scene = f.goto; S.index = 0; continue; } return showError(`장면 "${f.goto}" 을(를) 찾을 수 없어요.`); }
+            S.scene = f.scene; S.index = f.index; continue;
+          }
+          return showError(`장면 "${S.scene}" 이 끝났는데 다음으로 갈 곳(이동 / 엔딩)이 없어요.`);
+        }
         const cmd = list[S.index];
         S.lineIndex = S.index;
         S.index++;
@@ -595,6 +641,7 @@
         if (cmd.particles !== undefined) particles(cmd);
         if (cmd.tint !== undefined) setTint(cmd.tint);
         if (cmd.gauge !== undefined) showGauge(cmd.gauge, cmd.show !== false);
+        if (cmd.signal) { sendSignal(cmd.signal); continue; }
         if (cmd.sound) playSound(cmd.sound, cmd.volume);
         if (cmd.bgm !== undefined) playBgm(cmd.bgm, cmd.volume, cmd.fade);
         if (cmd.act) charAct(cmd.act, cmd.motion);
@@ -1327,12 +1374,14 @@
         // 예전 저장 파일은 효과 하나, 새 저장 파일은 여러 개
         [].concat(S.pfx || []).forEach((c) => particles(c));
         if (S.bgm) playBgm(S.bgm.name, S.bgm.volume, 0.8); else playBgm("", 1, 0.6);
-        S.hud = S.hud || [];
+        S.hud = S.hud || []; S.stack = S.stack || [];
+        if (!S.watch) primeWatches();
         renderChars(true);
         S.log.pop();
       } else {
         S = fresh(scene);
         unlock("seen", S.scene);
+        primeWatches();
         if (bgm.name && bgm.name === P.titleBgm) playBgm("", 1, 1); // 타이틀 음악은 게임이 시작되면 꺼져요
       }
       R.querySelectorAll(".vn-gauge").forEach((g) => g.remove()); hudPrev = {};

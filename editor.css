@@ -303,3 +303,8 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .motion-box { aspect-ratio: 4 / 3; cursor: default; }
 .block.k-bgm, .picker .k-bgm { --kc: var(--k-flow); }
 .block.k-act, .picker .k-act { --kc: var(--k-char); }
+
+/* ⚡ 시그널 */
+.sig-banner { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--r); background: color-mix(in srgb, #f5b800 14%, var(--surface)); border: 1px solid color-mix(in srgb, #f5b800 45%, var(--line)); }
+.sig-banner b { font-size: 15px; } .sig-banner span { font-size: 13px; color: var(--muted); }
+.block.k-signal, .picker .k-signal { --kc: #d99a00; }
