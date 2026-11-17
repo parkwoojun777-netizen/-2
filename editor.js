@@ -81,7 +81,7 @@
   function blankProject() {
     return {
       title: "새 비주얼 노벨", subtitle: "", titleBg: "", start: "시작",
-      vars: {}, backgrounds: {}, cgs: {}, items: {}, characters: {}, nameColors: { 나: "#ffd27a" },
+      vars: {}, gauges: {}, effects: {}, backgrounds: {}, cgs: {}, items: {}, characters: {}, nameColors: { 나: "#ffd27a" },
       story: { 시작: ["여기에 첫 문장을 써 보세요.", { end: "THE END" }] },
       memories: [], gallery: true,
       images: {},
@@ -153,6 +153,7 @@
     fx:     { label: "효과",        desc: "흔들기 · 번쩍 · 암전" },
     particles: { label: "입자 효과", desc: "벚꽃·비·안개·연기·물방울·불티 등 16가지" },
     tint:   { label: "화면 색감",   desc: "회상·흑백·밤·노을·꿈" },
+    gauge:  { label: "게이지",      desc: "변수 게이지 보이기 · 숨기기" },
     wait:   { label: "잠깐 멈춤",   desc: "몇 초 쉬어요" },
     minigame: { label: "미니게임",  desc: "그림 속 오브젝트를 골라 변수 바꾸기" },
     end:    { label: "엔딩",        desc: "게임을 끝내요" },
@@ -168,6 +169,7 @@
     if (b.minigame) return b.minigame === "pick" ? "minigame" : "raw"; // 예전 미니게임은 코드 블록으로 보여줘요
     if (b.particles !== undefined) return "particles";
     if (b.tint !== undefined) return "tint";
+    if (b.gauge !== undefined) return "gauge";
     if (b.varImage !== undefined) return "varimg";
     if (b.choice) return "choice";
     if (b.say !== undefined) return "say";
@@ -257,9 +259,10 @@
       case "wait": return { sec: (b.wait || 1000) / 1000 };
       case "fx": return { fx: b.shake ? "shake" : b.flash ? "flash:" + b.flash : "fade:" + b.fade };
       case "end": return { name: b.end };
-      case "particles": return b.particles === "off" ? { shape: "off", mode: "fall", color: PCOLOR.petal, x: 50, y: 40, amount: 2 }
-        : { shape: b.particles, mode: b.mode || "fall", color: (b.color || PCOLOR[b.particles] || "#ffffff").toLowerCase(), x: b.x == null ? 50 : b.x, y: b.y == null ? 40 : b.y, amount: b.amount || 2 };
+      case "particles": return b.particles === "off" ? { shape: "off", only: b.only || "", mode: "fall", color: PCOLOR.petal, x: 50, y: 40, amount: 2 }
+        : { shape: b.particles, mode: b.mode || "fall", color: (b.color || PCOLOR[b.particles] || "#ffffff").toLowerCase(), dir: b.dir == null ? null : b.dir, spread: b.spread == null ? null : b.spread, x: b.x == null ? 50 : b.x, y: b.y == null ? 40 : b.y, amount: b.amount || 2 };
       case "tint": return { tint: b.tint || "" };
+      case "gauge": return { name: b.gauge, show: b.show !== false };
       case "varimg": return {
         target: b.varImage, fit: b.fit || "contain",
         cases: (b.cases || []).map((x) => Object.assign(parseCond(x.if), { image: x.image == null ? "" : x.image })),
@@ -295,15 +298,17 @@
       case "fx": { const [a, c] = f.fx.split(":"); return a === "shake" ? { shake: true } : { [a]: c }; }
       case "end": return { end: f.name || "THE END" };
       case "particles": {
-        if (f.shape === "off") return { particles: "off" };
+        if (f.shape === "off") return f.only ? { particles: "off", only: f.only } : { particles: "off" };
         const o = { particles: f.shape };
         if (f.mode !== "fall") o.mode = f.mode;
-        if (f.color.toLowerCase() !== PCOLOR[f.shape]) o.color = f.color;
+        if (PCOLOR[f.shape] !== undefined && f.color.toLowerCase() !== PCOLOR[f.shape]) o.color = f.color;
+        if (f.dir != null) { o.dir = Math.round(f.dir); o.spread = Math.round(f.spread == null ? 60 : f.spread); }
         if (f.mode !== "fall") { o.x = Math.round(f.x); o.y = Math.round(f.y); }
         if (+f.amount !== 2) o.amount = +f.amount;
         return o;
       }
       case "tint": return { tint: f.tint };
+      case "gauge": return f.show ? { gauge: f.name } : { gauge: f.name, show: false };
       case "varimg": {
         const o = { varImage: f.target, cases: f.cases.filter((c) => c.var).map((c) => ({ if: `${c.var} ${c.op} ${c.val}`, image: c.image })) };
         if (f.else !== "__keep") o.else = f.else;
@@ -366,6 +371,7 @@
         objects: [Object.assign(newObj(1, 35, 60), { var: vars[0] || "" }), Object.assign(newObj(2, 65, 60), { var: vars[0] || "" })], active: 0 };
       case "particles": return { shape: "petal", mode: "spread", color: PCOLOR.petal, x: 50, y: 40, amount: 2 };
       case "tint": return { tint: "sepia" };
+      case "gauge": return { name: Object.keys(proj.gauges)[0] || "all", show: true };
       case "choice": return { options: [{ text: "", goto: "", var: "", op: "+", val: "1", if: "" }, { text: "", goto: "", var: "", op: "+", val: "1", if: "" }] };
     }
   }
@@ -388,10 +394,11 @@
       case "wait": return `${f.sec}초 멈춤`;
       case "fx": return FX[f.fx] || f.fx;
       case "end": return `🏁 ${f.name}`;
-      case "particles": return f.shape === "off" ? "입자 효과 끄기" :
+      case "particles": return f.shape === "off" ? (f.only ? `${PSHAPE[f.only] || "🎨 " + f.only} 끄기` : "입자 효과 모두 끄기") :
         [h("span", { style: { display: "inline-block", width: "12px", height: "12px", borderRadius: "50%", background: f.color, marginRight: "6px", verticalAlign: "-1px", border: "1px solid var(--line)" } }),
-          `${PSHAPE[f.shape] || f.shape} · ${PMODE[f.mode].split(" (")[0]}${f.mode !== "fall" ? ` (${Math.round(f.x)}%, ${Math.round(f.y)}%)` : ""}`];
+          `${PSHAPE[f.shape] || "🎨 " + f.shape} · ${PMODE[f.mode].split(" (")[0]}${f.mode !== "fall" ? ` (${Math.round(f.x)}%, ${Math.round(f.y)}%)` : ""}${f.dir != null ? ` · ${dirArrow(f.dir)} ${dirName(f.dir)}` : ""}`];
       case "tint": return `🎨 ${TINTS[f.tint] || f.tint}`;
+      case "gauge": return `📊 ${f.name === "all" ? "모든 게이지" : (proj.gauges[f.name] && proj.gauges[f.name].label) || f.name} ${f.show ? "보이기" : "숨기기"}`;
       case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기`),
         f.cases.map((c) => h("div", { class: "opt" }, `▸ ${c.var} ${c.op} ${c.val} 이면 → ${c.image || "숨기기"}`)),
         f.else !== "__keep" ? h("div", { class: "opt" }, `▸ 그 밖에는 → ${f.else || "숨기기"}`) : null];
@@ -474,6 +481,8 @@
         }
         if (k === "bg" && !proj.backgrounds[f.bg]) out.push(`${at}: 배경 "${f.bg}" 이 없어요.`);
         if (k === "cg" && f.cg && !proj.cgs[f.cg]) out.push(`${at}: 이벤트 그림 "${f.cg}" 이 없어요.`);
+        if (k === "particles" && f.shape !== "off" && PCOLOR[f.shape] === undefined && !proj.effects[f.shape]) out.push(`${at}: 입자 효과 "${f.shape}" 이 없어요.`);
+        if (k === "gauge" && f.name !== "all" && !proj.gauges[f.name]) out.push(`${at}: "${f.name}" 게이지가 없어요. [변수] 탭에서 켜 주세요.`);
         if ((k === "show" || k === "hide") && f.id !== "all" && !proj.characters[f.id]) out.push(`${at}: 캐릭터 "${f.id}" 이 없어요.`);
       });
       const flat = flatList(list);
@@ -667,10 +676,18 @@
   }
 
   // ----- 블록 편집 창 -----
-  function blockSheet(list, i, newKind, prefix) {
-    const isNew = !!newKind;
+  let lastBlockArgs = null;
+  // 내 효과를 만들고 돌아왔을 때 같은 블록 창을 그 효과로 다시 열어요
+  function blockSheetAgain(effectName) {
+    if (!lastBlockArgs) return;
+    const [list, i, newKind, prefix] = lastBlockArgs;
+    blockSheet(list, i, newKind || "particles", prefix, { shape: effectName, mode: "spread", x: 50, y: 50 }, !newKind);
+  }
+  function blockSheet(list, i, newKind, prefix, preset, editing) {
+    lastBlockArgs = [list, i, newKind, prefix];
+    const isNew = !!newKind && !editing;
     const k = newKind || kindOf(list[i]);
-    const f = isNew ? defaultForm(k) : toForm(list[i]);
+    const f = Object.assign(isNew || !list[i] ? defaultForm(k) : toForm(list[i]), preset || {});
     if (k === "raw") return rawSheet(list, i);
     const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
     const codeLine = h("code", { class: "hint", style: { whiteSpace: "pre-wrap", wordBreak: "break-all" } });
@@ -704,6 +721,175 @@
     }
     openSheet(`${isNew ? "새 " : ""}${KINDS[k].label}`, [body, codeLine], foot);
   }
+
+  // ===== 🧭 방향 고르기 (입자 효과 · 내 효과에서 같이 써요) =====
+  // o.dir: 도 (0 위 · 90 오른쪽 · 180 아래 · 270 왼쪽, null = 기본 방향), o.spread: 퍼지는 폭(도)
+  const ARROWS = [["↖", 315], ["↑", 0], ["↗", 45], ["←", 270], ["◎", -1], ["→", 90], ["↙", 225], ["↓", 180], ["↘", 135]];
+  function dirPicker(o, onChange, allowDefault) {
+    const wrap = h("div", { class: "dir-pick" });
+    const angleTxt = h("span", { class: "hint" });
+    const spreadTxt = h("span", { class: "hint" });
+    const grid = h("div", { class: "dir-grid" });
+    const angle = h("input", { type: "range", min: "0", max: "359", step: "1", value: o.dir == null ? 180 : o.dir, "aria-label": "방향 각도" });
+    const spread = h("input", { type: "range", min: "0", max: "360", step: "5", value: o.spread == null ? 60 : o.spread, "aria-label": "퍼지는 폭" });
+    const sync = () => {
+      grid.querySelectorAll("button").forEach((b) => b.classList.toggle("on", +b.dataset.d === (o.dir == null ? -2 : o.spread >= 360 ? -1 : o.dir)));
+      angleTxt.textContent = o.dir == null ? "기본 방향 (효과마다 원래 움직임)" : `방향 ${Math.round(o.dir)}° ${dirName(o.dir)}`;
+      spreadTxt.textContent = `퍼지는 폭 ${o.spread == null ? 60 : o.spread}°${(o.spread || 0) >= 360 ? " (사방으로)" : (o.spread || 0) <= 10 ? " (한 줄로)" : ""}`;
+      angle.value = o.dir == null ? 180 : o.dir; spread.value = o.spread == null ? 60 : o.spread;
+    };
+    ARROWS.forEach(([t, d]) => grid.append(h("button", { "data-d": d, "aria-label": d < 0 ? "사방으로" : dirName(d), onclick: (e) => {
+      e.preventDefault();
+      if (d < 0) { o.spread = 360; if (o.dir == null) o.dir = 0; } else { o.dir = d; if (o.spread == null || o.spread >= 360) o.spread = 60; }
+      sync(); onChange();
+    } }, t)));
+    angle.oninput = () => { o.dir = +angle.value; if (o.spread == null) o.spread = 60; sync(); onChange(); };
+    spread.oninput = () => { o.spread = +spread.value; if (o.dir == null) o.dir = 180; sync(); onChange(); };
+    put(wrap, grid, h("div", { class: "dir-sliders" },
+      h("label", { class: "f" }, angleTxt, angle), h("label", { class: "f" }, spreadTxt, spread),
+      allowDefault ? h("button", { class: "btn", style: { padding: "5px 10px", fontSize: "13px", alignSelf: "flex-start" }, onclick: (e) => { e.preventDefault(); o.dir = null; o.spread = null; sync(); onChange(); } }, "기본 방향으로") : null));
+    sync();
+    return wrap;
+  }
+  function dirName(d) {
+    const names = ["위", "오른쪽 위", "오른쪽", "오른쪽 아래", "아래", "왼쪽 아래", "왼쪽", "왼쪽 위"];
+    return names[Math.round((((d % 360) + 360) % 360) / 45) % 8];
+  }
+  const dirArrow = (d) => (d == null ? "" : "↑↗→↘↓↙←↖"[Math.round((((d % 360) + 360) % 360) / 45) % 8]);
+
+  // ===== 🎨 내 효과 (커스텀 입자) =====
+  const FX_SHAPES = { circle: "● 동그라미", glow: "◉ 빛 방울 (흐릿)", star: "★ 별", sparkle: "✦ 반짝이", heart: "♥ 하트", square: "■ 네모 조각", petal: "🌸 꽃잎", ring: "◯ 고리", line: "／ 줄 (빗줄기·유성)", emoji: "😀 이모지 · 글자", image: "🖼 오브젝트 그림" };
+  const FX_DEFAULT = { shape: "star", colors: ["#fff3a8", "#ffd23f"], sizeMin: 4, sizeMax: 9, dir: 0, spread: 50, speedMin: 60, speedMax: 160, gravity: 40, drag: 0.4,
+    lifeMin: 1.2, lifeMax: 2.4, alpha: 1, fadeIn: 0.1, fadeOut: 0.6, grow: -0.3, spin: 180, wobble: 0, twinkle: true, glow: true, flip: false, rate: 24, count: 50, area: 10, emoji: "⭐", image: "" };
+  const FX_PRESETS = {
+    "✨ 별가루": {},
+    "🎆 불꽃놀이": { shape: "glow", colors: ["#ff5d8f", "#ffd23f", "#5d9cec", "#3bceac"], sizeMin: 2, sizeMax: 4, spread: 360, speedMin: 120, speedMax: 260, gravity: 90, drag: 1.4, lifeMin: 1, lifeMax: 1.8, fadeOut: 0.7, grow: 0, spin: 0, twinkle: true, glow: true, count: 120, area: 0 },
+    "💖 하트 분수": { shape: "heart", colors: ["#ff6b8b", "#ffb7c5", "#ff4d6d"], sizeMin: 6, sizeMax: 12, dir: 0, spread: 40, speedMin: 180, speedMax: 300, gravity: 260, drag: 0.3, lifeMin: 1.6, lifeMax: 2.6, fadeOut: 0.4, grow: 0, spin: 90, twinkle: false, glow: false, rate: 18 },
+    "🌠 유성": { shape: "line", colors: ["#ffffff", "#bfefff"], sizeMin: 5, sizeMax: 9, dir: 225, spread: 6, speedMin: 420, speedMax: 620, gravity: 0, drag: 0, lifeMin: 0.8, lifeMax: 1.4, fadeOut: 0.8, grow: 0, spin: 0, twinkle: false, glow: true, rate: 2 },
+    "🌫 빛 먼지": { shape: "glow", colors: ["#fff8e1", "#ffe9a8"], sizeMin: 2, sizeMax: 5, dir: 0, spread: 360, speedMin: 5, speedMax: 25, gravity: -5, drag: 0.2, lifeMin: 3, lifeMax: 6, alpha: 0.8, fadeIn: 1, fadeOut: 0.5, grow: 0, spin: 0, twinkle: true, glow: true, wobble: 0.4, rate: 10, area: 200 },
+    "💬 이모지 펑": { shape: "emoji", emoji: "💕", colors: ["#ffffff"], sizeMin: 8, sizeMax: 14, dir: 0, spread: 120, speedMin: 120, speedMax: 240, gravity: 220, drag: 0.6, lifeMin: 1.2, lifeMax: 2, fadeOut: 0.5, grow: 0.2, spin: 60, twinkle: false, glow: false, count: 24 },
+  };
+  function fxSwatch(d) {
+    return h("span", { class: "fx-sw" }, (d.colors || []).slice(0, 5).map((c) => h("i", { style: { background: c } })));
+  }
+  function effectSheet(name, after) {
+    const isNew = name == null;
+    const d = Object.assign(clone(FX_DEFAULT), isNew ? {} : clone(proj.effects[name]));
+    const st = { name: isNew ? uniqueEffect("내 효과") : name, mode: "spread", x: 50, y: 60 };
+    const body = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
+    const err = h("p", { class: "hint", style: { color: "var(--danger)" } });
+    let inst = null, pvT = null;
+    const stage = h("div", { class: "pfx-stage" });
+    const dot = h("div", { class: "pos-dot", style: { left: st.x + "%", top: st.y + "%", background: (d.colors || [])[0] || "#fff" } });
+    const box = h("div", { class: "pos-box pfx-box" }, stage, dot);
+    const preview = () => {
+      if (inst) inst.destroy();
+      if (!stage.isConnected) return;
+      const bgName = Object.keys(proj.backgrounds)[0];
+      const fxName = "__preview__";
+      const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images, items: proj.items, effects: { [fxName]: clean(d) },
+        story: { a: [bgName ? { bg: bgName } : { wait: 1 }, Object.assign({ particles: fxName, mode: st.mode }, st.mode !== "fall" ? { x: Math.round(st.x), y: Math.round(st.y) } : {}), { wait: 2000000000 }] } };
+      inst = VN.mount(stage, P, { startScene: "a", preview: true });
+    };
+    const upd = () => { clearTimeout(pvT); pvT = setTimeout(preview, 250); dot.style.background = (d.colors || [])[0] || "#fff"; dot.hidden = st.mode === "fall"; };
+    const setFrom = (ev) => {
+      if (st.mode === "fall") return;
+      const r = box.getBoundingClientRect();
+      st.x = Math.max(0, Math.min(100, ((ev.clientX - r.left) / r.width) * 100)); st.y = Math.max(0, Math.min(100, ((ev.clientY - r.top) / r.height) * 100));
+      dot.style.left = st.x + "%"; dot.style.top = st.y + "%"; upd();
+    };
+    box.addEventListener("pointerdown", (ev) => { box.setPointerCapture(ev.pointerId); setFrom(ev); });
+    box.addEventListener("pointermove", (ev) => { if (ev.buttons || ev.pointerType === "touch") setFrom(ev); });
+    // 슬라이더 하나 = 숫자 하나
+    const slider = (label, key, min, max, step, fmt) => {
+      const txt = h("span", {}, `${label}: ${fmt(d[key])}`);
+      return h("label", { class: "f fx-slider" }, txt, h("input", { type: "range", min, max, step, value: d[key], oninput: (e) => { d[key] = +e.target.value; txt.textContent = `${label}: ${fmt(d[key])}`; upd(); } }));
+    };
+    const pair = (label, a, b, min, max, step, unit) => {
+      const txt = h("span", {});
+      const show = () => (txt.textContent = `${label}: ${d[a]} ~ ${d[b]}${unit}`);
+      const lo = h("input", { type: "range", min, max, step, value: d[a], "aria-label": label + " 최소", oninput: (e) => { d[a] = +e.target.value; if (d[a] > d[b]) { d[b] = d[a]; hi.value = d[b]; } show(); upd(); } });
+      const hi = h("input", { type: "range", min, max, step, value: d[b], "aria-label": label + " 최대", oninput: (e) => { d[b] = +e.target.value; if (d[b] < d[a]) { d[a] = d[b]; lo.value = d[a]; } show(); upd(); } });
+      show();
+      return h("label", { class: "f fx-slider" }, txt, h("div", { class: "fx-pair" }, lo, hi));
+    };
+    const check = (key, label) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!d[key], onchange: (e) => { d[key] = e.target.checked; upd(); } }), label);
+    const sec = (t) => h("b", { class: "fx-sec" }, t);
+    const draw = () => {
+      body.innerHTML = "";
+      put(body,
+        h("div", { class: "chips" }, Object.keys(FX_PRESETS).map((k) => h("button", { class: "chip", onclick: () => { Object.assign(d, clone(FX_DEFAULT), clone(FX_PRESETS[k])); draw(); upd(); } }, k))),
+        h("p", { class: "hint" }, "위 예시를 눌러 시작하고, 아래에서 하나씩 바꿔 보세요. 미리보기가 바로 바뀌어요."),
+        h("label", { class: "f" }, "미리보기 — 누른 곳에서 나와요", box),
+        h("div", { class: "chips" }, Object.entries({ spread: "퍼져 나오기 (계속)", burst: "펑! 터지기", fall: "화면 전체" }).map(([m, t]) =>
+          h("button", { class: "chip" + (st.mode === m ? " on" : ""), onclick: () => { st.mode = m; draw(); upd(); } }, t)),
+          h("button", { class: "chip", onclick: () => preview() }, "↻ 다시")),
+        field("효과 이름", h("input", { type: "text", value: st.name, placeholder: "예: 별가루", oninput: (e) => (st.name = e.target.value) })),
+        sec("모양 · 색"),
+        field("모양", h("select", { onchange: (e) => { d.shape = e.target.value; if (d.shape === "image" && !d.image) d.image = Object.keys(proj.items)[0] || ""; draw(); upd(); } },
+          Object.entries(FX_SHAPES).map(([v, t]) => h("option", { value: v, selected: v === d.shape }, t)))),
+        d.shape === "emoji" ? field("이모지나 글자 (한 글자)", h("input", { type: "text", value: d.emoji, maxlength: "4", oninput: (e) => { d.emoji = e.target.value; upd(); } })) : null,
+        d.shape === "image" ? (Object.keys(proj.items).length
+          ? field("오브젝트 그림", h("select", { onchange: (e) => { d.image = e.target.value; upd(); } }, Object.keys(proj.items).map((n) => h("option", { value: n, selected: n === d.image }, n))))
+          : h("p", { class: "hint" }, "오브젝트 그림이 없어요. [그림] 탭 → 오브젝트 그림에서 먼저 올려 주세요.")) : null,
+        h("div", { class: "row fx-colors" }, h("span", { class: "hint" }, d.shape === "emoji" || d.shape === "image" ? "색 (이모지·그림에는 안 쓰여요)" : "색 (여러 개면 섞여서 나와요)"),
+          d.colors.map((c, j) => h("span", { class: "fx-color" },
+            h("input", { type: "color", value: c, "aria-label": `색 ${j + 1}`, oninput: (e) => { d.colors[j] = e.target.value; upd(); } }),
+            d.colors.length > 1 ? h("button", { class: "icon-btn", "aria-label": "색 빼기", onclick: () => { d.colors.splice(j, 1); draw(); upd(); } }, "✕") : null)),
+          d.colors.length < 5 ? h("button", { class: "btn", style: { padding: "6px 10px" }, onclick: () => { d.colors.push("#ffffff"); draw(); upd(); } }, "+ 색") : null),
+        pair("크기", "sizeMin", "sizeMax", 1, 60, 1, "px"),
+        sec("방향 · 움직임"),
+        dirPicker(d, upd, false),
+        pair("빠르기", "speedMin", "speedMax", 0, 700, 5, ""),
+        slider("중력", "gravity", -400, 600, 10, (v) => (v > 0 ? `${v} (아래로 떨어져요)` : v < 0 ? `${v} (위로 떠올라요)` : "0 (그대로)")),
+        slider("느려짐 (공기 저항)", "drag", 0, 3, 0.1, (v) => (v ? v.toFixed(1) : "0 (안 느려져요)")),
+        slider("흔들림", "wobble", 0, 1, 0.05, (v) => (v ? Math.round(v * 100) + "%" : "없음")),
+        slider("회전", "spin", 0, 720, 10, (v) => (v ? `초당 ${v}°` : "안 돌아요")),
+        slider("나오는 범위", "area", 0, 300, 5, (v) => (v ? `${v}px 안에서 퍼져 나와요` : "한 점에서")),
+        sec("투명도 · 사라짐"),
+        slider("투명도", "alpha", 0.05, 1, 0.05, (v) => `${Math.round(v * 100)}% 보여요`),
+        pair("수명 (화면에 있는 시간)", "lifeMin", "lifeMax", 0.2, 10, 0.1, "초"),
+        slider("나타나는 시간", "fadeIn", 0, 2, 0.05, (v) => (v ? `${v.toFixed(2)}초 동안 서서히` : "바로 나타나요")),
+        slider("서서히 사라지는 정도", "fadeOut", 0, 1, 0.05, (v) => (v === 0 ? "끝에 갑자기 사라져요" : v >= 1 ? "처음부터 천천히 사라져요" : `수명의 마지막 ${Math.round(v * 100)}% 동안 사라져요`)),
+        slider("크기 변화", "grow", -1, 3, 0.1, (v) => (v === 0 ? "그대로" : v < 0 ? `점점 작아져요 (${Math.round(v * 100)}%)` : `점점 커져요 (+${Math.round(v * 100)}%)`)),
+        h("div", { class: "row" }, check("twinkle", "깜빡이기"), check("glow", "빛나게 (겹치면 밝아짐)"), check("flip", "뒤집히며 날기")),
+        sec("양"),
+        slider("계속 나올 때: 1초에", "rate", 1, 120, 1, (v) => `${v}개`),
+        slider("펑! 터질 때", "count", 5, 200, 5, (v) => `${v}개`),
+        err);
+    };
+    draw();
+    const foot = [h("button", { class: "btn primary grow", onclick: () => {
+      const v = st.name.trim();
+      if (!v) return (err.textContent = "효과 이름을 써 주세요.");
+      if (PCOLOR[v] !== undefined || v === "off") return (err.textContent = "기본 효과와 같은 이름은 쓸 수 없어요.");
+      if (v !== name && proj.effects[v]) return (err.textContent = "같은 이름의 효과가 있어요.");
+      if (!isNew && v !== name) { delete proj.effects[name]; eachBlock((b) => { if (b && b.particles === name) b.particles = v; }); }
+      proj.effects[v] = clean(d);
+      if (inst) inst.destroy();
+      closeSheet(); changed();
+      toast(`「${v}」 효과를 저장했어요`);
+      if (after) after(v);
+    } }, "저장")];
+    if (!isNew) {
+      const del = h("button", { class: "btn danger", onclick: () => {
+        if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "정말 삭제"; return; }
+        delete proj.effects[name]; closeSheet(); changed();
+      } }, "삭제");
+      foot.push(del);
+    }
+    openSheet(isNew ? "🎨 새 효과 만들기" : "🎨 효과 고치기", [body], foot);
+    upd();
+  }
+  // 저장할 때는 쓰는 값만 남겨요
+  function clean(d) {
+    const o = {};
+    for (const k of Object.keys(FX_DEFAULT)) if (d[k] !== undefined && d[k] !== "") o[k] = d[k];
+    if (o.shape !== "emoji") delete o.emoji;
+    if (o.shape !== "image") delete o.image;
+    return o;
+  }
+  function uniqueEffect(base) { let n = base, i = 2; while (proj.effects[n]) n = `${base} ${i++}`; return n; }
 
   // ===== 🔀 장면 나누기 · 분기 만들기 · 장면 지도 =====
   function uniqueScene(base) { let n = base, i = 2; while (proj.story[n]) n = `${base} ${i++}`; return n; }
@@ -987,10 +1173,25 @@
       case "fx": return [field("효과", sel("fx", FX))];
       case "end": return [field("엔딩 이름", inp("name", { placeholder: "예: GOOD END — 약속" }))];
       case "particles": {
-        const shapes = Object.assign({}, PSHAPE, { off: "⏹ 입자 효과 끄기" });
-        const parts = [field("모양", h("select", { onchange: (e) => { const old = f.shape; f.shape = e.target.value; if (PCOLOR[f.shape] && f.color.toLowerCase() === (PCOLOR[old] || "").toLowerCase()) f.color = PCOLOR[f.shape]; redraw(); } },
-          Object.entries(shapes).map(([v, t]) => h("option", { value: v, selected: v === f.shape }, t))))];
-        if (f.shape === "off") { f._preview = null; return [...parts, h("p", { class: "hint" }, "계속 나오던 입자를 멈춰요. 이미 나온 입자는 자연스럽게 사라져요.")]; }
+        const isCustom = PCOLOR[f.shape] === undefined && f.shape !== "off";
+        const myFx = Object.keys(proj.effects);
+        const parts = [field("모양", h("select", { onchange: (e) => {
+            if (e.target.value === "__new") return effectSheet(null, (name) => blockSheetAgain(name));
+            const old = f.shape; f.shape = e.target.value; if (PCOLOR[f.shape] && f.color.toLowerCase() === (PCOLOR[old] || "").toLowerCase()) f.color = PCOLOR[f.shape]; redraw(); } },
+          h("optgroup", { label: "기본 효과" }, Object.entries(PSHAPE).map(([v, t]) => h("option", { value: v, selected: v === f.shape }, t))),
+          h("optgroup", { label: "🎨 내 효과" }, myFx.map((n) => h("option", { value: n, selected: n === f.shape }, "🎨 " + n)),
+            isCustom && !proj.effects[f.shape] ? h("option", { value: f.shape, selected: true }, `⚠ ${f.shape} (없는 효과)`) : null,
+            h("option", { value: "__new" }, "＋ 새 효과 만들기…")),
+          h("option", { value: "off", selected: f.shape === "off" }, "⏹ 입자 효과 끄기"))),
+          isCustom && proj.effects[f.shape] ? h("button", { class: "btn", style: { alignSelf: "flex-start" }, onclick: () => effectSheet(f.shape, (name) => blockSheetAgain(name)) }, `🎨 「${f.shape}」 효과 고치기`) : null];
+        if (f.shape === "off") {
+          f._preview = null;
+          const offOpts = { "": "계속 나오는 효과 모두" };
+          Object.entries(PSHAPE).forEach(([v, t]) => (offOpts[v] = t));
+          myFx.forEach((n) => (offOpts[n] = "🎨 " + n));
+          return [...parts, field("어떤 효과를 끌까요?", sel("only", offOpts)),
+            h("p", { class: "hint" }, "계속 나오는 효과는 여러 개를 같이 켤 수 있어요 (예: 비 + 안개). 이미 나온 입자는 자연스럽게 사라져요.")];
+        }
         const point = f.mode !== "fall";
         // 미리보기 + 위치 고르기: 실제 게임 엔진으로 효과를 보여주고, 누른 곳이 입자가 나오는 지점이 돼요
         const stage = h("div", { class: "pfx-stage" });
@@ -1012,7 +1213,7 @@
           if (inst) inst.destroy();
           if (!stage.isConnected) return;
           const bgName = Object.keys(proj.backgrounds)[0];
-          const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images,
+          const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images, items: proj.items, effects: proj.effects,
             story: { a: [bgName ? { bg: bgName } : { wait: 1 }, fromForm("particles", f), { wait: 2000000000 }] } };
           inst = VN.mount(stage, P, { startScene: "a", preview: true });
         };
@@ -1020,9 +1221,10 @@
           field("나오는 방식", sel("mode", PMODE, true)),
           h("label", { class: "f" }, point ? "미리보기 — 누른 곳에서 나와요" : "미리보기", box, h("div", { class: "row" }, posTxt,
             h("button", { class: "btn", style: { marginLeft: "auto", padding: "5px 10px", fontSize: "13px" }, onclick: (e) => { e.preventDefault(); f._preview && f._preview(); } }, "↻ 다시 보기"))),
+          h("label", { class: "f" }, "🧭 나오는 방향", dirPicker(f, upd, true)),
           h("div", { class: "row" },
-            h("label", { class: "f", style: { flex: "none" } }, "색", h("input", { type: "color", value: f.color, oninput: (e) => { f.color = e.target.value; if (dot) dot.style.background = f.color; upd(); } })),
-            h("button", { class: "btn", style: { alignSelf: "flex-end" }, onclick: () => { f.color = PCOLOR[f.shape]; redraw(); } }, "기본 색"),
+            isCustom ? null : h("label", { class: "f", style: { flex: "none" } }, "색", h("input", { type: "color", value: f.color, oninput: (e) => { f.color = e.target.value; if (dot) dot.style.background = f.color; upd(); } })),
+            isCustom ? null : h("button", { class: "btn", style: { alignSelf: "flex-end" }, onclick: () => { f.color = PCOLOR[f.shape]; redraw(); } }, "기본 색"),
             field("양", sel("amount", { 1: "적게", 2: "보통", 3: "많이" }))),
           MULTI[f.shape] ? h("p", { class: "hint" }, "기본 색이면 여러 색이 섞여서 나와요.") : null);
         if (point) {
@@ -1032,6 +1234,17 @@
         if (PTIP[f.shape]) parts.push(h("p", { class: "hint" }, "💡 " + PTIP[f.shape]));
         parts.push(h("p", { class: "hint" }, f.mode === "burst" ? "한 번 나오고 끝나요." : "끌 때까지 계속 나와요. 멈추려면 [입자 효과] 블록에서 '끄기'를 넣어 주세요."));
         return parts;
+      }
+      case "gauge": {
+        const names = Object.keys(proj.gauges);
+        if (!names.length) return [h("p", { class: "hint" }, "게이지가 아직 없어요. [변수] 탭에서 숫자 변수의 '📊 게이지로 보여주기'를 켜 주세요.")];
+        const opts = { all: "모든 게이지" }; names.forEach((n) => (opts[n] = `${proj.gauges[n].icon || "📊"} ${proj.gauges[n].label || n}`));
+        return [
+          field("어떤 게이지?", sel("name", opts)),
+          field("어떻게?", h("select", { onchange: (e) => { f.show = e.target.value === "show"; upd(); } },
+            h("option", { value: "show", selected: f.show }, "보이기"), h("option", { value: "hide", selected: !f.show }, "숨기기"))),
+          h("p", { class: "hint" }, "'항상 보이기'로 설정한 게이지는 이 블록 없이도 늘 보여요. 게이지는 변수 값이 바뀔 때마다 차오르거나 줄어들어요."),
+        ];
       }
       case "tint": return [field("화면 색감", sel("tint", TINTS)), h("p", { class: "hint" }, "배경과 캐릭터의 색을 바꿔요. 대사 창은 그대로예요. 되돌리려면 '원래대로'를 넣어 주세요.")];
       case "varimg": {
@@ -1252,6 +1465,13 @@
         h("div", { class: "pic", style: { backgroundImage: `url("${imgSrc(ref)}")`, backgroundSize: "contain", backgroundColor: "#000" } }),
         h("div", { class: "cap" }, h("b", {}, n), h("small", {}, `{ cg: "${n}" }`)))),
       h("button", { class: "thumb add", onclick: () => bgSheet(null, "cgs") }, "+ 이벤트 그림 추가")));
+
+    w.append(h("h3", { class: "sec" }, "🎨 내 효과 (입자)"),
+      h("p", { class: "hint" }, "모양 · 색 · 방향 · 투명도 · 사라지는 정도까지 직접 정한 입자 효과예요. 스토리의 [입자 효과] 블록에서 골라 써요."));
+    w.append(h("div", { class: "fx-list" },
+      Object.entries(proj.effects).map(([n, d]) => h("button", { class: "fx-card", onclick: () => effectSheet(n) },
+        h("b", {}, n), h("small", {}, `${FX_SHAPES[d.shape] || d.shape}${d.dir != null ? ` · ${dirArrow(d.dir)}` : ""}`), fxSwatch(d))),
+      h("button", { class: "fx-card add", onclick: () => effectSheet(null) }, "+ 새 효과 만들기")));
 
     w.append(h("h3", { class: "sec" }, "오브젝트 그림"),
       h("p", { class: "hint" }, "미니게임에서 일러스트 위에 놓을 물건 그림이에요 (편지, 열쇠, 선물 등). 흰 배경은 자동으로 지울 수 있어요."));
@@ -1506,6 +1726,7 @@
   }
   function renameVar(from, to) {
     const V = {}; for (const [k, v] of Object.entries(proj.vars)) V[k === from ? to : k] = v; proj.vars = V;
+    if (proj.gauges[from]) { proj.gauges[to] = proj.gauges[from]; delete proj.gauges[from]; }
     const fixSet = (s) => { if (s && from in s) { s[to] = s[from]; delete s[from]; } };
     const fixIf = (e) => String(e).replace(new RegExp("^\\s*" + from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)"), to);
     eachBlock((b) => {
@@ -1514,7 +1735,43 @@
       if (b.choice) b.choice.forEach((o) => { fixSet(o.set); if (o.if) o.if = fixIf(o.if); });
       if (b.cases) b.cases.forEach((c) => (c.if = fixIf(c.if)));
       if (b.minigame) { if (b.score === from) b.score = to; (b.objects || []).forEach((o) => fixSet(o.set)); }
+      if (b.gauge === from) b.gauge = to;
     });
+  }
+  // 📊 숫자 변수를 게이지로 보여주기
+  function gaugeEditor(name) {
+    const g = proj.gauges[name];
+    const box = h("div", { class: "gauge-edit" });
+    const toggle = h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!g, onchange: (e) => {
+      if (e.target.checked) proj.gauges[name] = { label: name, icon: "💗", color: "#ff6b8b", min: 0, max: 10, always: true };
+      else delete proj.gauges[name];
+      changed();
+    } }), "📊 게임 화면에 게이지로 보여주기");
+    box.append(toggle);
+    if (!g) return box;
+    const val = +proj.vars[name] || 0;
+    const fill = h("div", { class: "gp-fill" });
+    const prevLabel = h("b", {}), prevVal = h("span", {}), prevIc = h("span", { class: "gp-ic" });
+    const sync = () => {
+      const pct = Math.max(0, Math.min(100, ((val - (+g.min || 0)) / (((+g.max || 0) - (+g.min || 0)) || 1)) * 100));
+      fill.style.width = pct + "%"; fill.style.background = g.color; prevLabel.textContent = g.label || name; prevIc.textContent = g.icon || "";
+      prevVal.textContent = g.hideValue ? "" : `${val} / ${g.max}`;
+    };
+    const set = (k, v) => { g[k] = v; sync(); changed({ render: false }); };
+    put(box,
+      h("div", { class: "gauge-prev" }, prevIc, prevLabel, prevVal, h("div", { class: "gp-bar" }, fill)),
+      h("div", { class: "grid3" },
+        field("표시 이름", h("input", { type: "text", value: g.label || "", oninput: (e) => set("label", e.target.value) })),
+        field("아이콘", h("input", { type: "text", value: g.icon || "", maxlength: "4", placeholder: "💗", oninput: (e) => set("icon", e.target.value) })),
+        h("label", { class: "f" }, "색", h("input", { type: "color", value: g.color || "#ff6b8b", oninput: (e) => set("color", e.target.value) }))),
+      h("div", { class: "grid3" },
+        field("가장 작을 때 (빈 칸)", h("input", { type: "number", value: g.min == null ? 0 : g.min, oninput: (e) => set("min", +e.target.value || 0) })),
+        field("가장 클 때 (꽉 참)", h("input", { type: "number", value: g.max == null ? 10 : g.max, oninput: (e) => set("max", +e.target.value || 0) })),
+        field("보이기", h("select", { onchange: (e) => set("always", e.target.value === "always") },
+          h("option", { value: "always", selected: g.always !== false }, "항상"), h("option", { value: "block", selected: g.always === false }, "[게이지] 블록으로")))),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: !g.hideValue, onchange: (e) => set("hideValue", !e.target.checked) }), "숫자도 보여주기 (예: 3 / 10)"));
+    sync();
+    return box;
   }
   function renderVars(w) {
     w.append(h("h3", { class: "sec" }, "변수"),
@@ -1539,7 +1796,7 @@
         : h("input", { type: type === "num" ? "number" : "text", value: String(val), oninput: (e) => { proj.vars[name] = type === "num" ? +e.target.value || 0 : e.target.value; changed({ render: false }); } });
       const del = h("button", { class: "btn danger del", "aria-label": `${name} 삭제`, onclick: () => {
         if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "정말?"; return; }
-        delete proj.vars[name]; changed();
+        delete proj.vars[name]; delete proj.gauges[name]; changed();
       } }, "삭제");
       const uses = varUses(name);
       card.append(h("div", { class: "var-row" },
@@ -1547,7 +1804,8 @@
         field("종류", h("select", { onchange: (e) => { proj.vars[name] = e.target.value === "num" ? 0 : e.target.value === "bool" ? false : ""; changed(); } },
           h("option", { value: "num", selected: type === "num" }, "숫자"), h("option", { value: "str", selected: type === "str" }, "글자"), h("option", { value: "bool", selected: type === "bool" }, "참/거짓"))),
         field("처음 값", valIn), del,
-        h("div", { class: "uses" }, uses ? `스토리에서 ${uses}번 쓰여요` : "아직 스토리에서 안 쓰여요")));
+        h("div", { class: "uses" }, uses ? `스토리에서 ${uses}번 쓰여요` : "아직 스토리에서 안 쓰여요"),
+        type === "num" ? gaugeEditor(name) : null));
     });
     card.append(h("button", { class: "btn dashed wide", onclick: () => {
       let n = "변수", i = 1; while (n + i in proj.vars) i++;
@@ -1617,9 +1875,11 @@
         '{ varImage: "charlotte",\n  cases: [ { if: "호감도 >= 3", image: "smile" } ],\n  else: "pout" }\n\n{ minigame: "pick", image: "교실", picks: 1, labels: true,\n  objects: [\n    { name: "사탕", x: 30, y: 60, text: "달콤해 보인다.", set: { 호감도: +1 } },\n    { name: "숙제", x: 70, y: 55, hidden: true, text: "숨겨진 숙제를 찾았다!" },\n  ],\n  goto: "다음장면" }'),
       L("8. 입자 효과 · 색감 · 회상방", "particles 는 입자 모양, mode 는 나오는 방식(fall 흩날리기 / spread 퍼지기 / burst 터지기), x·y 는 화면에서의 위치(%)예요. memories 에 넣은 장면은 회상방에서 다시 볼 수 있어요.",
         '{ particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 }\n{ particles: "off" }      // 끄기\n{ tint: "sepia" }         // 회상 색감\n{ tint: "" }              // 원래대로\n\nmemories: [ { scene: "좋은엔딩", title: "노을빛 약속" } ],'),
-      L("9. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
+      L("9. 게이지 · 방향 · 내 효과", "gauges 에 변수 이름을 쓰면 그 변수가 게이지로 보여요. 입자 효과의 dir 은 방향(0 위, 90 오른쪽, 180 아래, 270 왼쪽), spread 는 퍼지는 폭이에요. effects 에 만든 효과는 particles 에 이름을 써서 불러요.",
+        'gauges: { 호감도: { icon: "💗", max: 10, color: "#ff6b8b", always: true } },\neffects: { 별가루: { shape: "star", colors: ["#fff3a8"], alpha: 0.9, fadeOut: 0.6, dir: 0, spread: 50 } },\n\n{ particles: "petal", mode: "spread", dir: 90, spread: 30 }  // 오른쪽으로\n{ particles: "별가루", mode: "burst", x: 50, y: 40 }\n{ gauge: "호감도", show: false }                       // 숨기기'),
+      L("10. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
         '{ group: "아침 인사", blocks: [\n  { bg: "classroom" },\n  "샬럿: 좋은 아침!",\n  "나: 안녕.",\n] },'),
-      L("10. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("11. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {

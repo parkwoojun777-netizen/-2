@@ -256,3 +256,33 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .map-warn { font-size: 11.5px; color: var(--danger); }
 .warn-check { align-items: flex-start; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); border-radius: 10px; padding: 10px; }
 .warn-check input { margin-top: 3px; flex: none; }
+
+/* 🧭 방향 고르기 */
+.dir-pick { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.dir-grid { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; flex: none; }
+.dir-grid button { height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 18px; }
+.dir-grid button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.dir-sliders { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 8px; }
+.dir-sliders input, .fx-slider input { width: 100%; }
+
+/* 🎨 내 효과 */
+.fx-sec { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; }
+.fx-slider { gap: 2px; }
+.fx-pair { display: flex; gap: 10px; }
+.fx-pair input { flex: 1; min-width: 0; }
+.fx-colors { gap: 6px; }
+.fx-color { display: inline-flex; align-items: center; }
+.fx-color .icon-btn { width: 28px; height: 28px; font-size: 13px; }
+.fx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.fx-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; padding: 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); }
+.fx-card b { font-size: 14px; } .fx-card small { color: var(--muted); font-size: 12px; }
+.fx-card.add { align-items: center; justify-content: center; border-style: dashed; color: var(--muted); background: transparent; min-height: 84px; }
+.fx-sw { display: flex; gap: 3px; } .fx-sw i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); }
+
+/* 📊 게이지 설정 */
+.gauge-edit { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: var(--surface-2); }
+.gauge-prev { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 3px 8px; padding: 8px 12px; border-radius: 12px; background: #141a2c; color: #f3f6ff; font-size: 12px; max-width: 260px; }
+.gauge-prev .gp-ic { font-size: 17px; grid-row: span 2; }
+.gauge-prev .gp-bar { grid-column: 2 / 4; height: 8px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
+.gauge-prev .gp-fill { height: 100%; border-radius: 4px; }
+.block.k-gauge, .picker .k-gauge { --kc: var(--k-var); }

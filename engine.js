@@ -74,6 +74,17 @@
   .vn-toast{position:absolute;z-index:30;left:50%;top:20%;transform:translate(-50%,-10px);background:var(--vn-accent);color:#0b1020;padding:8px 18px;border-radius:999px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
   .vn-toast.on{opacity:1;transform:translate(-50%,0)}
   .vn-error{color:#ffb4b4}
+  .vn-hud{position:absolute;z-index:1;left:10px;top:calc(10px + env(safe-area-inset-top,0px));width:min(230px,48%);display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .vn-gauge{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:3px 8px;padding:6px 10px;border-radius:12px;background:rgba(10,14,26,.74);border:1px solid var(--vn-line);font-size:12px;animation:vn-pop .3s both}
+  .vn-gauge .ic{font-size:17px;grid-row:span 2;line-height:1}
+  .vn-gauge .lb{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vn-gauge .val{font-variant-numeric:tabular-nums;opacity:.85}
+  .vn-gauge .bar{grid-column:2/4;height:8px;border-radius:4px;background:rgba(255,255,255,.14);overflow:hidden}
+  .vn-gauge .fill{height:100%;width:0;border-radius:4px;transition:width .7s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 8px currentColor}
+  .vn-gauge.bump{animation:vn-bump .5s}
+  @keyframes vn-bump{30%{transform:scale(1.07)}}
+  .vn-gauge .delta{position:absolute;right:10px;top:-6px;font-weight:700;font-size:14px;text-shadow:0 1px 3px #000;animation:vn-delta 1.2s forwards}
+  @keyframes vn-delta{to{transform:translateY(-18px);opacity:0}}
   .vn-root.vn-preview .vn-menu,.vn-root.vn-preview .vn-box,.vn-root.vn-preview .vn-title{display:none!important}
   .vn-scene{position:absolute;inset:0;transition:filter .8s}
   .vn-scene[data-tint="sepia"]{filter:sepia(.8) contrast(.95) brightness(1.02)}
@@ -137,6 +148,7 @@
     <div class="vn-choices" hidden></div>
     <div class="vn-mg" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
+    <div class="vn-hud"></div>
     <div class="vn-menu">
       <button class="vn-exit" data-a="exit" hidden>✕ 테스트 종료</button>
       <button data-a="auto">자동</button><button data-a="skip">스킵</button><button data-a="log">로그</button>
@@ -191,7 +203,7 @@
       stage: q(".vn-stage"), bg: q(".vn-bg"), bg2: q(".vn-bg2"), chars: q(".vn-chars"),
       cg: q(".vn-cg"), scene: q(".vn-scene"), tintfx: q(".vn-tintfx"), pfx: q(".vn-pfx"),
       gallery: q(".vn-gallery"), galBody: q(".vn-gal-body"), viewer: q(".vn-viewer"), box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
-      choices: q(".vn-choices"), mg: q(".vn-mg"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
+      choices: q(".vn-choices"), mg: q(".vn-mg"), hud: q(".vn-hud"), menu: q(".vn-menu"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
       panel: q(".vn-panel"), panelTitle: q(".vn-panel-title"), panelBody: q(".vn-panel-body"), toastEl: q(".vn-toast"),
     };
 
@@ -202,6 +214,8 @@
     const CHARS = P.characters || {};
     const BGS = P.backgrounds || {};
     const CGS = P.cgs || {};
+    const GAUGES = P.gauges || {};   // 변수 게이지 설정
+    const EFFECTS = P.effects || {}; // 직접 만든 입자 효과
     const SLOTS = 6;
     const SAVE_KEY = "vn_save_" + (P.title || "game");
     const SPEED_KEY = "vn_speed";
@@ -223,10 +237,16 @@
     function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 
     function fresh(scene) {
-      return { scene: scene || P.start, index: 0, lineIndex: 0, vars: JSON.parse(JSON.stringify(P.vars || {})), bg: null, chars: {}, log: [] };
+      return { scene: scene || P.start, index: 0, lineIndex: 0, vars: JSON.parse(JSON.stringify(P.vars || {})), bg: null, chars: {}, log: [], hud: [] };
     }
 
-    function layout() { R.classList.toggle("portrait", R.clientHeight > R.clientWidth); if (pfx.ctx) pfxResize(); }
+    function layout() {
+      const portrait = R.clientHeight > R.clientWidth;
+      R.classList.toggle("portrait", portrait);
+      if (pfx.ctx) pfxResize();
+      // 세로 화면에서는 메뉴가 두 줄이 되니 게이지를 메뉴 아래로 내려요
+      el.hud.style.top = portrait ? el.menu.offsetTop + el.menu.offsetHeight + 8 + "px" : "";
+    }
     const ro = window.ResizeObserver ? new ResizeObserver(layout) : null;
     if (ro) ro.observe(R); else window.addEventListener("resize", layout);
 
@@ -365,6 +385,7 @@
 
     // ---------- 변수 / 조건 ----------
     function applySet(obj) {
+      setTimeout(updateHud, 0); // 값이 바뀌면 게이지도 움직여요
       for (const [k, v] of Object.entries(obj)) {
         if (typeof v === "number") S.vars[k] = (+S.vars[k] || 0) + v;
         else if (typeof v === "string" && v[0] === "=") { const r = v.slice(1); S.vars[k] = r === "true" ? true : r === "false" ? false : isNaN(+r) || r === "" ? r : +r; }
@@ -434,6 +455,7 @@
         if (cmd.varImage !== undefined) applyVarImage(cmd);
         if (cmd.particles !== undefined) particles(cmd);
         if (cmd.tint !== undefined) setTint(cmd.tint);
+        if (cmd.gauge !== undefined) showGauge(cmd.gauge, cmd.show !== false);
         if (cmd.bg) setBg(cmd.bg);
         if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {
@@ -454,6 +476,46 @@
       }
     }
 
+    // ---------- 📊 변수 게이지 ----------
+    let hudPrev = {};
+    function showGauge(name, on) {
+      S.hud = S.hud || [];
+      const names = name === "all" ? Object.keys(GAUGES) : [name];
+      for (const n of names) { S.hud = S.hud.filter((x) => x !== n); if (on) S.hud.push(n); }
+      updateHud();
+    }
+    function updateHud() {
+      if (!S || dead) return;
+      const want = Object.keys(GAUGES).filter((n) => GAUGES[n] && (GAUGES[n].always || (S.hud || []).includes(n)));
+      [...el.hud.children].forEach((g) => { if (!want.includes(g.dataset.v)) g.remove(); });
+      want.forEach((n) => {
+        const cfg = GAUGES[n], v = +S.vars[n] || 0;
+        const min = +cfg.min || 0, max = cfg.max == null ? 10 : +cfg.max;
+        const pct = Math.max(0, Math.min(100, ((v - min) / ((max - min) || 1)) * 100));
+        let g = el.hud.querySelector(`[data-v="${window.CSS && CSS.escape ? CSS.escape(n) : n}"]`);
+        if (!g) {
+          g = document.createElement("div"); g.className = "vn-gauge"; g.dataset.v = n;
+          g.innerHTML = '<span class="ic"></span><span class="lb"></span><span class="val"></span><div class="bar"><div class="fill"></div></div>';
+          el.hud.appendChild(g);
+          // 처음에는 0 에서 차오르게
+          requestAnimationFrame(() => requestAnimationFrame(() => (g.querySelector(".fill").style.width = pct + "%")));
+        } else g.querySelector(".fill").style.width = pct + "%";
+        const color = cfg.color || "#ff6b8b";
+        g.querySelector(".ic").textContent = cfg.icon || "";
+        g.querySelector(".ic").hidden = !cfg.icon;
+        g.querySelector(".lb").textContent = cfg.label || n;
+        g.querySelector(".val").textContent = cfg.hideValue ? "" : `${v}${cfg.showMax === false ? "" : " / " + max}`;
+        const fill = g.querySelector(".fill"); fill.style.background = color; fill.style.color = color;
+        if (hudPrev[n] !== undefined && hudPrev[n] !== v) {
+          const d = v - hudPrev[n];
+          g.classList.remove("bump"); void g.offsetWidth; g.classList.add("bump");
+          const pop = document.createElement("span"); pop.className = "delta"; pop.textContent = (d > 0 ? "+" : "") + d; pop.style.color = d > 0 ? color : "#9aa4c0";
+          g.appendChild(pop); later(() => pop.remove(), 1200);
+        }
+        hudPrev[n] = v;
+      });
+    }
+
     // ---------- 화면 색감 ----------
     function setTint(t) { S.tint = t || ""; el.scene.dataset.tint = S.tint; el.tintfx.dataset.tint = S.tint; }
 
@@ -467,7 +529,7 @@
     const RATE_FALL = { rain: 70, storm: 140, sparkle: 12, dot: 12, steam: 6, smoke: 7, fog: 1.1, drip: 4, ember: 14, leaf: 6, firefly: 3, bubble: 6, confetti: 25 };
     const RATE_POINT = { steam: 5, smoke: 11, fog: 1.2, drip: 3, ember: 25, firefly: 4, bubble: 8, confetti: 30, rain: 40, storm: 50 };
     const BURST = { steam: 10, smoke: 14, fog: 6, drip: 16, confetti: 60, ember: 40, firefly: 15, bubble: 18 };
-    const pfx = { list: [], emit: null, raf: 0, last: 0, acc: 0, ctx: null, w: 0, h: 0, dpr: 1, bolt: 0 };
+    const pfx = { list: [], emits: [], raf: 0, last: 0, acc: 0, ctx: null, w: 0, h: 0, dpr: 1, bolt: 0 };
     function pfxResize() {
       pfx.dpr = Math.min(2, window.devicePixelRatio || 1);
       pfx.w = R.clientWidth || 1; pfx.h = R.clientHeight || 1;
@@ -475,27 +537,65 @@
       pfx.ctx = el.pfx.getContext("2d");
     }
     function particles(cmd) {
-      if (!cmd || !cmd.particles || cmd.particles === "off") { pfx.emit = null; if (S) S.pfx = null; return; }
+      // 끄기: 모두 끄거나, { particles: "off", only: "rain" } 처럼 하나만
+      if (!cmd || !cmd.particles || cmd.particles === "off") {
+        pfx.emits = cmd && cmd.only ? pfx.emits.filter((e) => e.name !== cmd.only) : [];
+        if (S) S.pfx = pfx.emits.map((e) => e.cmd);
+        return;
+      }
       pfxResize();
-      const shape = cmd.particles in PFX_COLOR ? cmd.particles : "dot";
+      const custom = !(cmd.particles in PFX_COLOR) && EFFECTS[cmd.particles] ? EFFECTS[cmd.particles] : null;
+      const shape = custom ? "custom" : cmd.particles in PFX_COLOR ? cmd.particles : "dot";
       const c = {
-        shape, mode: cmd.mode || "fall", color: cmd.color || PFX_COLOR[shape] || "",
+        shape, custom, mode: cmd.mode || "fall", color: cmd.color || PFX_COLOR[shape] || "",
         x: cmd.x == null ? 50 : +cmd.x, y: cmd.y == null ? 50 : +cmd.y,
         amount: Math.min(3, Math.max(1, +cmd.amount || 2)),
+        dir: cmd.dir == null ? (custom && custom.dir != null ? +custom.dir : null) : +cmd.dir, // 방향(도): 0 위 · 90 오른쪽 · 180 아래 · 270 왼쪽
+        spread: cmd.spread == null ? (custom && custom.spread != null ? +custom.spread : null) : +cmd.spread,
       };
-      if (c.mode === "burst") for (let i = 0; i < c.amount * (BURST[shape] || 28); i++) spawn(c);
+      if (c.mode === "burst") for (let i = 0; i < c.amount * (custom ? (+custom.count || 40) / 2 : BURST[shape] || 28); i++) spawn(c);
       else {
-        pfx.emit = c; pfx.bolt = performance.now() + 1500; if (S) S.pfx = cmd;
+        // 계속 나오는 효과는 여러 개를 같이 켤 수 있어요 (같은 효과는 새 설정으로 바뀌어요)
+        c.name = cmd.particles; c.cmd = cmd; c.acc = 0; c.bolt = performance.now() + 1500;
+        pfx.emits = pfx.emits.filter((e) => e.name !== c.name).concat(c).slice(-4);
+        if (S) S.pfx = pfx.emits.map((e) => e.cmd);
         // 안개 · 반딧불은 천천히 생겨서, 처음부터 어느 정도 깔려 있게 미리 만들어 둬요
         const warm = c.mode === "fall" ? { fog: 7, firefly: 8 }[shape] : 0;
         for (let i = 0; i < (warm || 0) * c.amount; i++) { spawn(c); const q = pfx.list[pfx.list.length - 1]; if (q) { q.life = q.max * (0.15 + Math.random() * 0.5); q.x = Math.random() * pfx.w; } }
       }
       if (!pfx.raf) { pfx.last = performance.now(); pfx.raf = requestAnimationFrame(tick); }
     }
-    function pfxStop() { pfx.emit = null; pfx.list = []; cancelAnimationFrame(pfx.raf); pfx.raf = 0; if (pfx.ctx) pfx.ctx.clearRect(0, 0, el.pfx.width, el.pfx.height); }
+    function pfxStop() { pfx.emits = []; pfx.list = []; cancelAnimationFrame(pfx.raf); pfx.raf = 0; if (pfx.ctx) pfx.ctx.clearRect(0, 0, el.pfx.width, el.pfx.height); }
 
+    // 방향(도, 시계 방향: 0 = 위)을 속도 벡터로
+    const dirVec = (deg) => { const r = (deg * Math.PI) / 180; return [Math.sin(r), -Math.cos(r)]; };
+    const BASE_DIR = { petal: 180, leaf: 180, snow: 180, heart: 180, rain: 180, storm: 180, drip: 180, confetti: 180, steam: 0, smoke: 0, ember: 0, bubble: 0, fog: 90 };
+    // 화면 전체 모드: 들어오는 쪽 가장자리에서 시작하게 옮겨요
+    function entryEdge(p, deg, W, H) {
+      const [bx, by] = dirVec(deg);
+      if (Math.abs(by) >= Math.abs(bx)) { p.x = Math.random() * W * 1.2 - W * 0.1; p.y = by > 0 ? -20 : H + 20; }
+      else { p.x = bx > 0 ? -20 : W + 20; p.y = Math.random() * H * 1.2 - H * 0.1; }
+    }
+    function spawnCustom(c) {
+      const d = c.custom, W = pfx.w, H = pfx.h, u = Math.max(0.7, Math.min(W, H) / 420), rnd = Math.random;
+      const rng = (a, b, def) => { a = a == null ? def : +a; b = b == null ? a : +b; return a + rnd() * (b - a); };
+      const colors = (d.colors && d.colors.length ? d.colors : ["#ffffff"]);
+      const burst = c.mode === "burst", fall = c.mode === "fall";
+      const dir = c.dir == null ? 180 : c.dir, spread = c.spread == null ? 40 : c.spread;
+      const an = dir + (rnd() - 0.5) * spread;
+      const [vx, vy] = dirVec(an);
+      const sp = rng(d.speedMin, d.speedMax, 80) * u * (burst ? 1.8 : 1);
+      const p = { shape: "custom", custom: d, color: colors[(rnd() * colors.length) | 0], vx: vx * sp, vy: vy * sp,
+        g: (+d.gravity || 0) * u, drag: burst ? Math.max(1.2, +d.drag || 0) : +d.drag || 0, life: 0, max: rng(d.lifeMin, d.lifeMax, 3),
+        size: rng(d.sizeMin, d.sizeMax, 8) * u, rot: rnd() * 6.28, vr: ((+d.spin || 0) * Math.PI / 180) * (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd()),
+        sway: rnd() * 6.28, swayAmp: (+d.wobble || 0) * 1.5, grow: +d.grow || 0, wander: 0, flip: !!d.flip };
+      if (fall) { if (spread >= 300) { p.x = rnd() * W; p.y = rnd() * H; } else entryEdge(p, dir, W, H); }
+      else { const area = (+d.area || 0) * u; p.x = (W * c.x) / 100 + (rnd() - 0.5) * area; p.y = (H * c.y) / 100 + (rnd() - 0.5) * area; }
+      pfx.list.push(p);
+    }
     function spawn(c) {
       if (pfx.list.length > 700) return;
+      if (c.custom) return spawnCustom(c);
       const W = pfx.w, H = pfx.h, u = Math.max(0.7, Math.min(W, H) / 420), rnd = Math.random;
       const fall = c.mode === "fall", burst = c.mode === "burst";
       const px = (W * c.x) / 100, py = (H * c.y) / 100;
@@ -573,6 +673,18 @@
           else { up(burst ? 1.6 : 1.0, burst ? 300 : 200, burst ? 700 : 450); p.drag = burst ? 1.8 : 1.5; p.g = (burst ? 420 : 380) * u; p.max = 2.4 + rnd() * 1.5; }
           break;
       }
+      // 방향을 정했으면 그쪽으로 날아가게 돌려요
+      if (c.dir != null && c.shape !== "firefly") {
+        const spd = Math.hypot(p.vx, p.vy);
+        if (!fall) {
+          const [dx, dy] = dirVec(c.dir + (Math.random() - 0.5) * (c.spread == null ? 60 : c.spread));
+          p.vx = dx * spd; p.vy = dy * spd; p.g = 0; p.splash = false;
+        } else if (BASE_DIR[c.shape] !== undefined && spd > 0) {
+          const delta = ((c.dir - BASE_DIR[c.shape]) * Math.PI) / 180, cs = Math.cos(delta), sn = Math.sin(delta);
+          [p.vx, p.vy] = [p.vx * cs - p.vy * sn, p.vx * sn + p.vy * cs];
+          if (Math.abs(c.dir - BASE_DIR[c.shape]) > 1) { p.g = 0; p.splash = false; if (c.shape !== "fog") entryEdge(p, c.dir, W, H); }
+        }
+      }
       pfx.list.push(p);
     }
     function splash(p) {
@@ -649,17 +761,81 @@
       ctx.restore();
       ctx.globalCompositeOperation = "source-over";
     }
+    // 직접 만든 효과: 투명도 · 나타나는 시간 · 사라지는 정도
+    function customAlpha(p) {
+      const d = p.custom, t = p.life / p.max;
+      let a = d.alpha == null ? 1 : +d.alpha;
+      const fi = +d.fadeIn || 0;
+      if (fi > 0) a *= Math.min(1, p.life / fi);
+      const fo = d.fadeOut == null ? 0.5 : +d.fadeOut; // 수명 중 마지막 몇 % 동안 서서히 사라질지 (0 = 갑자기, 1 = 처음부터 천천히)
+      if (fo > 0 && t > 1 - fo) a *= Math.max(0, (1 - t) / fo);
+      if (d.twinkle) a *= 0.55 + 0.45 * Math.sin(p.life * 9 + p.rot * 5);
+      return Math.max(0, Math.min(1, a));
+    }
+    const imgCache = {};
+    function itemImage(name) {
+      const ref = ITEMS[name] || name;
+      if (!imgCache[ref]) { const im = new Image(); im.src = img(ref); imgCache[ref] = im; }
+      return imgCache[ref];
+    }
+    function drawCustom(ctx, p, a) {
+      const d = p.custom, t = Math.min(1, p.life / p.max);
+      const s = Math.max(0.1, p.size * (1 + (p.grow || 0) * t));
+      ctx.save(); ctx.translate(p.x, p.y);
+      if (d.glow) ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
+      if (d.shape !== "line") ctx.rotate(p.rot);
+      if (p.flip) ctx.scale(1, Math.cos(p.sway * 3));
+      switch (d.shape) {
+        case "glow": soft(ctx, s * 1.6, p.color, a); break;
+        case "star": {
+          ctx.beginPath();
+          for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.45 : s; const an = (i * Math.PI) / 5 - Math.PI / 2; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+          ctx.closePath(); ctx.fill(); break;
+        }
+        case "sparkle": {
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) { const r = i % 2 ? s * 0.22 : s; const an = (i * Math.PI) / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+          ctx.closePath(); ctx.fill(); break;
+        }
+        case "heart":
+          ctx.scale(s / 10, s / 10); ctx.beginPath(); ctx.moveTo(0, 3);
+          ctx.bezierCurveTo(-10, -4, -5, -11, 0, -5); ctx.bezierCurveTo(5, -11, 10, -4, 0, 3); ctx.lineTo(0, 7); ctx.fill(); break;
+        case "square": ctx.fillRect(-s / 2, -s / 2, s, s); break;
+        case "petal":
+          ctx.beginPath(); ctx.moveTo(0, -s);
+          ctx.quadraticCurveTo(s * 0.95, -s * 0.15, s * 0.15, s); ctx.lineTo(0, s * 0.75); ctx.lineTo(-s * 0.15, s);
+          ctx.quadraticCurveTo(-s * 0.95, -s * 0.15, 0, -s); ctx.fill(); break;
+        case "ring": ctx.lineWidth = Math.max(1, s * 0.18); ctx.beginPath(); ctx.arc(0, 0, s, 0, 6.29); ctx.stroke(); break;
+        case "line": {
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          ctx.lineWidth = Math.max(1, s * 0.25); ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo((-p.vx / sp) * s * 3, (-p.vy / sp) * s * 3); ctx.stroke(); break;
+        }
+        case "emoji":
+          ctx.font = `${Math.round(s * 2)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+          ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.emoji || "⭐", 0, 0); break;
+        case "image": {
+          const im = itemImage(d.image);
+          if (im.complete && im.naturalWidth) { const w = s * 2, h = (im.naturalHeight / im.naturalWidth) * w; ctx.drawImage(im, -w / 2, -h / 2, w, h); }
+          break;
+        }
+        case "circle": default:
+          ctx.beginPath(); ctx.arc(0, 0, s, 0, 6.29); ctx.fill();
+      }
+      ctx.restore();
+      ctx.globalCompositeOperation = "source-over";
+    }
     function tick(now) {
       if (dead || !R.isConnected) { pfx.raf = 0; return; }
       const dt = Math.min(0.05, (now - pfx.last) / 1000); pfx.last = now;
-      const e = pfx.emit;
-      if (e) {
-        const rate = (e.mode === "fall" ? RATE_FALL[e.shape] || 9 : RATE_POINT[e.shape] || 20) * e.amount;
-        pfx.acc += rate * dt;
-        while (pfx.acc >= 1) { spawn(e); pfx.acc--; }
+      for (const e of pfx.emits) {
+        const rate = e.custom ? ((+e.custom.rate || 20) * e.amount) / 2 : (e.mode === "fall" ? RATE_FALL[e.shape] || 9 : RATE_POINT[e.shape] || 20) * e.amount;
+        e.acc += rate * dt;
+        while (e.acc >= 1) { spawn(e); e.acc--; }
         // 폭우: 가끔 번개가 번쩍
-        if (e.shape === "storm" && now > pfx.bolt) {
-          pfx.bolt = now + 3500 + Math.random() * 5000;
+        if (e.shape === "storm" && now > e.bolt) {
+          e.bolt = now + 3500 + Math.random() * 5000;
           flash("rgba(235,240,255,.85)", 320);
           later(() => flash("rgba(235,240,255,.6)", 420), 140);
         }
@@ -677,6 +853,7 @@
         if (p.splash && p.y >= p.ground) { splash(p); return false; }
         const m = p.size * (1 + (p.grow || 0)) + 40;
         if (p.life > p.max || p.y > H + m || p.y < -m - 40 || p.x < -m || p.x > W + m) return false;
+        if (p.custom) { drawCustom(ctx, p, customAlpha(p)); return true; }
         let a = p.envelope ? Math.sin(Math.PI * Math.min(1, p.life / p.max)) : p.fade ? Math.max(0, 1 - p.life / p.max) : 0.9;
         a *= Math.min(1, p.life / 0.15);
         if (p.blink) a *= 0.35 + 0.65 * Math.max(0, Math.sin(p.life * 2.5 + p.rot * 3));
@@ -685,7 +862,7 @@
         return true;
       });
       ctx.globalAlpha = 1;
-      if (!pfx.list.length && !pfx.emit) { pfx.raf = 0; ctx.clearRect(0, 0, W, H); return; }
+      if (!pfx.list.length && !pfx.emits.length) { pfx.raf = 0; ctx.clearRect(0, 0, W, H); return; }
       pfx.raf = requestAnimationFrame(tick);
     }
 
@@ -874,7 +1051,7 @@
         mgClear();
         M.hidden = true; M.innerHTML = "";
         S.log.push({ name: "🎮", text: `${cmd.title || "미니게임"} — ${picked}개 골랐어요` });
-        if (cmd.score) S.vars[cmd.score] = picked;
+        if (cmd.score) { S.vars[cmd.score] = picked; updateHud(); }
         const t = target || cmd.goto;
         if (t) jump(t); else run();
       }
@@ -922,13 +1099,17 @@
         if (S.bg) setBg(S.bg, true);
         setCg(S.cg, S.cgFit);
         setTint(S.tint);
-        if (S.pfx) particles(S.pfx);
+        // 예전 저장 파일은 효과 하나, 새 저장 파일은 여러 개
+        [].concat(S.pfx || []).forEach((c) => particles(c));
+        S.hud = S.hud || [];
         renderChars(true);
         S.log.pop();
       } else {
         S = fresh(scene);
         unlock("seen", S.scene);
       }
+      el.hud.innerHTML = ""; hudPrev = {};
+      updateHud();
       run();
     }
 

@@ -20,6 +20,9 @@
    { particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 } → 입자 효과
                                         (petal/leaf/snow/rain/storm/drip/fog/steam/smoke/ember/sparkle/firefly/dot/bubble/heart/confetti
                                          · fall/spread/burst · { particles: "off" } 로 끄기)
+   { particles: "petal", mode: "spread", dir: 90, spread: 30 } → 방향: 0 위 · 90 오른쪽 · 180 아래 · 270 왼쪽
+   { particles: "별가루", mode: "burst" } → effects 에 직접 만든 효과
+   { gauge: "호감도", show: false }       → 게이지 보이기/숨기기 (gauges 설정)
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
@@ -34,6 +37,18 @@ const PROJECT = {
   // 변수와 처음 값
   vars: {
     호감도: 0,
+  },
+
+  // 변수 게이지: 값이 바뀌면 화면 왼쪽 위 게이지가 차올라요
+  gauges: {
+    호감도: { label: "호감도", icon: "💗", color: "#ff6b8b", min: 0, max: 5, always: true },
+  },
+
+  // 직접 만든 입자 효과 (창작기 [그림] 탭 → 🎨 내 효과)
+  effects: {
+    별가루: { shape: "star", colors: ["#fff3a8", "#ffd23f", "#ffffff"], sizeMin: 4, sizeMax: 9, dir: 0, spread: 70,
+      speedMin: 90, speedMax: 220, gravity: 120, drag: 0.6, lifeMin: 1.2, lifeMax: 2.2, alpha: 1, fadeIn: 0.05, fadeOut: 0.6,
+      grow: -0.4, spin: 200, twinkle: true, glow: true, count: 60, rate: 24, area: 10 },
   },
 
   // 배경: 이름 → 이미지
@@ -125,6 +140,7 @@ const PROJECT = {
     ],
     약속: [
       { say: "샬럿", face: "smile", text: "그럼 내일, 여기서." },
+      { particles: "별가루", mode: "burst", x: 50, y: 30 },
       { goto: "판정" },
     ],
     판정: [
