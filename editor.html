@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>노벨 공방</title>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<!--EDITOR-BODY-->
+<div id="app">
+  <header id="top">
+    <div class="brand"><span class="brand-mark">공방</span><span id="proj-name"></span></div>
+    <span id="save-state" aria-live="polite"></span>
+    <button id="btn-menu" class="icon-btn" aria-label="메뉴">☰</button>
+  </header>
+  <main id="view"></main>
+  <nav id="tabs">
+    <button data-tab="story" class="on"><i>✎</i>스토리</button>
+    <button data-tab="assets"><i>▣</i>그림</button>
+    <button data-tab="vars"><i>#</i>변수</button>
+    <button data-tab="code"><i>{ }</i>코드</button>
+    <button data-tab="play" class="play"><i>▶</i>테스트</button>
+  </nav>
+</div>
+<div id="sheet-wrap" hidden>
+  <div id="sheet" role="dialog" aria-modal="true">
+    <div id="sheet-head"><h2 id="sheet-title"></h2><button id="sheet-x" class="icon-btn" aria-label="닫기">✕</button></div>
+    <div id="sheet-body"></div>
+    <div id="sheet-foot"></div>
+  </div>
+</div>
+<div id="player" hidden></div>
+<div id="toast"></div>
+<input type="file" id="file-in" accept="image/*" hidden>
+<input type="file" id="json-in" accept=".json,application/json" hidden>
+<!--/EDITOR-BODY-->
+<script src="story.js"></script>
+<script src="engine.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>
