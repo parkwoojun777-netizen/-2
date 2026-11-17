@@ -81,7 +81,7 @@
   function blankProject() {
     return {
       title: "새 비주얼 노벨", subtitle: "", titleBg: "", start: "시작",
-      vars: {}, gauges: {}, watches: [], effects: {}, backgrounds: {}, cgs: {}, items: {}, sounds: {}, characters: {}, nameColors: { 나: "#ffd27a" },
+      vars: {}, gauges: {}, watches: [], effects: {}, backgrounds: {}, cgs: {}, items: {}, pics: {}, sounds: {}, characters: {}, nameColors: { 나: "#ffd27a" },
       story: { 시작: ["여기에 첫 문장을 써 보세요.", { end: "THE END" }] },
       memories: [], gallery: true,
       images: {},
@@ -131,6 +131,7 @@
     Object.values(proj.backgrounds).forEach(mark);
     Object.values(proj.cgs).forEach(mark);
     Object.values(proj.items).forEach(mark);
+    Object.values(proj.pics).forEach(mark);
     Object.values(proj.sounds).forEach(mark);
     Object.values(proj.characters).forEach((c) => Object.values(c.faces || {}).forEach(mark));
     for (const id of Object.keys(proj.images)) if (!used.has(id)) delete proj.images[id];
@@ -221,12 +222,13 @@
   const newObj = (i, x, y) => ({ name: `오브젝트 ${i}`, x, y, size: 12, look: "marker", item: "", text: "", say: "", var: "", op: "+", val: "1", goto: "", once: true });
   const artRef = (name) => proj.cgs[name] || proj.backgrounds[name] || proj.items[name] || "";
   function imageChoices(target) {
+    if (target === "pic") return Object.assign({ "": "숨기기 (이 자리 비우기)" }, Object.fromEntries(Object.keys(proj.pics).map((n) => [n, "🧩 " + n])));
     if (target === "bg") return Object.fromEntries(Object.keys(proj.backgrounds).map((n) => [n, n]));
     if (target === "cg") return Object.assign({ "": "숨기기" }, Object.fromEntries(Object.keys(proj.cgs).map((n) => [n, n])));
     const c = proj.characters[target];
     return c ? Object.fromEntries(Object.keys(c.faces || {}).map((n) => [n, n])) : {};
   }
-  const targetName = (t) => (t === "bg" ? "배경" : t === "cg" ? "이벤트 그림" : `${charName(t)} 표정`);
+  const targetName = (t) => (t === "pic" ? "화면 위 그림" : t === "bg" ? "배경" : t === "cg" ? "이벤트 그림" : `${charName(t)} 표정`);
 
   const PSHAPE = {
     petal: "🌸 벚꽃잎", leaf: "🍂 낙엽", snow: "❄ 눈", rain: "🌧 비", storm: "⛈ 폭우 + 번개", drip: "💧 물방울 떨어지기",
@@ -282,7 +284,8 @@
       case "varimg": return {
         target: b.varImage, fit: b.fit || "contain",
         cases: (b.cases || []).map((x) => Object.assign(parseCond(x.if), { image: x.image == null ? "" : x.image })),
-        else: b.else === undefined ? "__keep" : b.else };
+        else: b.else === undefined ? "__keep" : b.else,
+        slot: b.slot || "그림", x: b.x == null ? 50 : b.x, y: b.y == null ? 50 : b.y, w: b.w == null ? 25 : b.w, layer: b.layer || "front", anim: b.anim || "fade" };
       case "minigame": return {
         title: b.title || "", hint: b.hint || "", image: b.image || "", picks: String(b.picks || 0), labels: !!b.labels, goto: b.goto || "", score: b.score || "",
         objects: (b.objects || []).map((o) => Object.assign({
@@ -345,6 +348,7 @@
         const o = { varImage: f.target, cases: f.cases.filter((c) => c.var).map((c) => ({ if: `${c.var} ${c.op} ${c.val}`, image: c.image })) };
         if (f.else !== "__keep") o.else = f.else;
         if (f.target === "cg" && f.fit === "cover") o.fit = "cover";
+        if (f.target === "pic") Object.assign(o, { slot: f.slot || "그림", x: Math.round(f.x), y: Math.round(f.y), w: f.w, layer: f.layer, anim: f.anim });
         return o;
       }
       case "minigame": {
@@ -394,9 +398,9 @@
       case "fx": return { fx: "shake" };
       case "end": return { name: "THE END" };
       case "varimg": {
-        const target = Object.keys(proj.cgs).length ? "cg" : Object.keys(proj.characters)[0] || "bg";
+        const target = "pic";
         const first = Object.keys(imageChoices(target)).find((x) => x) || "";
-        return { target, fit: "contain", cases: [{ var: vars[0] || "", op: ">=", val: "1", image: first }], else: "__keep" };
+        return { target, fit: "contain", cases: [{ var: vars[0] || "", op: ">=", val: "1", image: first }], else: "__keep", slot: "그림", x: 50, y: 30, w: 25, layer: "front", anim: "pop" };
       }
       case "minigame": return {
         title: "", hint: "", image: Object.keys(proj.cgs)[0] || Object.keys(proj.backgrounds)[0] || "", picks: "1", labels: true, goto: "", score: "",
@@ -443,7 +447,7 @@
         f.steps.slice(0, 4).map((st, j) => h("div", { class: "opt" }, `${j + 1}. ${st.image ? "🖼 " + st.image + " " : ""}${st.sound ? "🔊 " : ""}${st.fx || st.particles ? "✨ " : ""}${st.text ? (st.say ? st.say + ": " : "") + st.text.slice(0, 24) : "(탭)"}`)),
         f.steps.length > 4 ? h("div", { class: "opt" }, `… ${f.steps.length - 4}단계 더`) : null];
       case "gauge": return `📊 ${f.name === "all" ? "모든 게이지" : (proj.gauges[f.name] && proj.gauges[f.name].label) || f.name} ${f.show ? "보이기" : "숨기기"}`;
-      case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기`),
+      case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기${f.target === "pic" ? ` · 자리 「${f.slot}」 (${Math.round(f.x)}%, ${Math.round(f.y)}%) · 너비 ${f.w}%` : ""}`),
         f.cases.map((c) => h("div", { class: "opt" }, `▸ ${c.var} ${c.op} ${c.val} 이면 → ${c.image || "숨기기"}`)),
         f.else !== "__keep" ? h("div", { class: "opt" }, `▸ 그 밖에는 → ${f.else || "숨기기"}`) : null];
       case "minigame": return [h("div", {}, `🎮 ${f.title || "그림 속 오브젝트 고르기"} · 🖼 ${f.image || "그림 없음"}${+f.picks ? ` · ${f.picks}개 고르기` : " · 자유롭게 고르기"}`),
@@ -1064,7 +1068,8 @@
   function previewBlock(block) {
     const P = clone(proj); P.title = (P.title || "") + " (테스트)";
     const bgName = Object.keys(proj.backgrounds)[0];
-    P.story = Object.assign({}, P.story, { __블록미리보기: [bgName ? { bg: bgName } : { wait: 1 }, block, { end: "미리보기 끝" }] });
+    // 블록이 끝나면 바로 엔딩 화면이 덮지 않게, 탭을 한 번 기다려요
+    P.story = Object.assign({}, P.story, { __블록미리보기: [bgName ? { bg: bgName } : { wait: 1 }, block, { tap: true }, { end: "미리보기 끝" }] });
     const box = $("#player"); box.hidden = false;
     if (playerInst) playerInst.destroy();
     playerInst = VN.mount(box, P, { startScene: "__블록미리보기", onExit: stopPlay });
@@ -1593,24 +1598,32 @@
       }
       case "tint": return [field("화면 색감", sel("tint", TINTS)), h("p", { class: "hint" }, "배경과 캐릭터의 색을 바꿔요. 대사 창은 그대로예요. 되돌리려면 '원래대로'를 넣어 주세요.")];
       case "varimg": {
-        const targets = { bg: "배경", cg: "이벤트 그림" };
+        const targets = { pic: "🧩 화면 위 그림 (위치 자유)", bg: "배경", cg: "이벤트 그림" };
         Object.entries(proj.characters).forEach(([id, c]) => (targets[id] = `${c.name}의 표정`));
         const imgs = imageChoices(f.target);
+        const isPic = f.target === "pic";
+        const refOf = (val) => f.target === "pic" ? proj.pics[val] : f.target === "bg" ? proj.backgrounds[val] : f.target === "cg" ? proj.cgs[val] : ((proj.characters[f.target] || {}).faces || {})[val];
         const imgSel = (val, on) => h("select", { onchange: (e) => { on(e.target.value); redraw(); } },
           Object.entries(imgs).map(([v, t]) => h("option", { value: v, selected: v === val }, t)),
           val && !(val in imgs) ? h("option", { value: val, selected: true }, `⚠ ${val}`) : null);
         const preview = (val) => {
-          const ref = f.target === "bg" ? proj.backgrounds[val] : f.target === "cg" ? proj.cgs[val] : ((proj.characters[f.target] || {}).faces || {})[val];
+          const ref = refOf(val);
           return ref ? h("div", { class: "face-row", style: { gridTemplateColumns: "64px 1fr" } }, h("div", { class: "pic", style: { backgroundImage: `url("${imgSrc(ref)}")` } }), h("span", { class: "hint" }, val)) : null;
         };
-        return [
+        const parts = [
           h("p", { class: "hint" }, "변수 값에 따라 다른 그림을 보여줘요. 위 조건부터 차례로 확인해서 처음 맞는 조건의 그림을 써요."),
           noVarsHint(),
           field("무엇을 바꿀까요?", h("select", { onchange: (e) => {
             f.target = e.target.value; const first = Object.keys(imageChoices(f.target)).find((x) => x) || "";
             f.cases.forEach((c) => (c.image = first)); if (f.else !== "__keep") f.else = first; redraw();
           } }, Object.entries(targets).map(([v, t]) => h("option", { value: v, selected: v === f.target }, t)))),
-          !Object.keys(imgs).filter((x) => x).length ? h("p", { class: "hint", style: { color: "var(--danger)" } }, "고를 그림이 없어요. [그림] 탭에서 먼저 올려 주세요.") : null,
+          isPic ? imageInput({ kind: "sprite", label: "🧩 변수 그림 올리기 (흰 배경 자동 지움)", white: () => f._white !== false }, (ref, file) => {
+            const n = uniqueName(proj.pics, fileBase(file, "그림")); proj.pics[n] = ref; changed({ render: false });
+            const empty = f.cases.find((c) => !c.image); if (empty) empty.image = n; else if (!f.cases.length) f.else = n;
+            redraw();
+          }) : null,
+          isPic ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: f._white !== false, onchange: (e) => (f._white = e.target.checked) }), "올릴 때 흰 배경 지우기") : null,
+          !Object.keys(imgs).filter((x) => x).length ? h("p", { class: "hint", style: { color: "var(--danger)" } }, isPic ? "변수 그림이 아직 없어요. 위 버튼으로 올리거나 [그림] 탭 → 🧩 변수 그림에서 올려 주세요." : "고를 그림이 없어요. [그림] 탭에서 먼저 올려 주세요.") : null,
           f.target === "cg" ? field("맞추기", sel("fit", { contain: "그림 전체 보이기", cover: "화면 꽉 채우기" })) : null,
           f.cases.map((c, j) => h("div", { class: "opt-card" },
             h("div", { class: "row" }, h("b", { style: { flex: "none" } }, j === 0 ? "만약" : "아니고 만약"),
@@ -1619,13 +1632,51 @@
               field("변수", varsSelect(c.var, (v) => { c.var = v; upd(); })),
               field("비교", h("select", { onchange: (e) => { c.op = e.target.value; upd(); } }, [">=", "<=", ">", "<", "==", "!="].map((x) => h("option", { value: x, selected: c.op === x }, x)))),
               field("값", h("input", { type: "text", value: c.val, oninput: (e) => { c.val = e.target.value; upd(); } }))),
-            field("이면 이 그림", imgSel(c.image, (v) => (c.image = v))), preview(c.image))),
+            field("이면 이 그림", imgSel(c.image, (v) => { c.image = v; f._pv = v; })), preview(c.image))),
           h("button", { class: "btn dashed wide", onclick: () => { f.cases.push({ var: Object.keys(proj.vars)[0] || "", op: ">=", val: "1", image: Object.keys(imgs).find((x) => x) || "" }); redraw(); } }, "+ 조건 추가"),
           field("어느 조건에도 안 맞으면", h("select", { onchange: (e) => { f.else = e.target.value; redraw(); } },
             h("option", { value: "__keep", selected: f.else === "__keep" }, "그대로 두기"),
             Object.entries(imgs).map(([v, t]) => h("option", { value: v, selected: v === f.else }, t)))),
           f.else !== "__keep" ? preview(f.else) : null,
         ];
+        if (isPic) {
+          // 🧩 어디에 나올지: 미리보기 화면을 눌러서(끌어서) 위치, 슬라이더로 크기
+          const shown = f._pv || (f.cases.find((c) => c.image) || {}).image || (f.else !== "__keep" ? f.else : "");
+          const bgRef = proj.backgrounds[proj.titleBg] || Object.values(proj.backgrounds)[0];
+          const pv = h("img", { class: "pic-pv", alt: "", src: shown && proj.pics[shown] ? imgSrc(proj.pics[shown]) : "", style: { left: f.x + "%", top: f.y + "%", width: f.w + "%" } });
+          const box = h("div", { class: "pos-box pic-box" + (f._portrait ? " portrait" : ""), style: { backgroundImage: bgRef ? `url("${imgSrc(bgRef)}")` : "" } },
+            h("div", { class: "pic-box-text" }), pv);
+          const posTxt = h("span", { class: "hint" });
+          const showPos = () => (posTxt.textContent = `가로 ${Math.round(f.x)}% · 세로 ${Math.round(f.y)}% · 너비 ${f.w}%`);
+          const setFrom = (ev) => {
+            const r = box.getBoundingClientRect();
+            f.x = Math.max(0, Math.min(100, ((ev.clientX - r.left) / r.width) * 100)); f.y = Math.max(0, Math.min(100, ((ev.clientY - r.top) / r.height) * 100));
+            pv.style.left = f.x + "%"; pv.style.top = f.y + "%"; showPos(); upd();
+          };
+          box.addEventListener("pointerdown", (ev) => { box.setPointerCapture(ev.pointerId); setFrom(ev); });
+          box.addEventListener("pointermove", (ev) => { if (ev.buttons || ev.pointerType === "touch") setFrom(ev); });
+          showPos();
+          const wTxt = h("span", {}, `크기 (화면 너비의 ${f.w}%)`);
+          const slots = new Set(["그림"]);
+          eachBlock((b) => { if (b && b.varImage === "pic" && b.slot) slots.add(b.slot); });
+          const presets = { "왼쪽 위": [14, 18], "가운데 위": [50, 16], "오른쪽 위": [86, 18], "가운데": [50, 45], "왼쪽": [18, 50], "오른쪽": [82, 50], "대사창 위": [50, 66] };
+          parts.push(
+            h("b", { class: "fx-sec" }, "🧩 어디에 나올까요?"),
+            h("div", { class: "chips" },
+              h("button", { class: "chip" + (f._portrait ? "" : " on"), onclick: () => { f._portrait = false; redraw(); } }, "가로 화면으로 보기"),
+              h("button", { class: "chip" + (f._portrait ? " on" : ""), onclick: () => { f._portrait = true; redraw(); } }, "세로 화면으로 보기")),
+            h("label", { class: "f" }, "미리보기 — 누르거나 끌어서 위치를 정해요 (그림 가운데 기준)", box, posTxt),
+            h("div", { class: "row" }, Object.entries(presets).map(([t, [x, y]]) => h("button", { class: "btn", style: { padding: "6px 10px", fontSize: "13px" }, onclick: () => { f.x = x; f.y = y; redraw(); } }, t))),
+            h("label", { class: "f" }, wTxt, h("input", { type: "range", min: "3", max: "100", step: "1", value: f.w, oninput: (e) => { f.w = +e.target.value; pv.style.width = f.w + "%"; wTxt.textContent = `크기 (화면 너비의 ${f.w}%)`; showPos(); upd(); } })),
+            h("div", { class: "grid3" },
+              field("층", sel("layer", { back: "캐릭터 뒤", front: "캐릭터 앞", top: "맨 앞 (대사창 위)" })),
+              field("나타나기", sel("anim", { fade: "서서히", pop: "톡 튀어나오기", drop: "위에서 떨어지기", slide: "옆에서 밀려오기", none: "바로" })),
+              field("자리 이름", h("input", { type: "text", value: f.slot, list: "pic-slots", placeholder: "그림", oninput: (e) => { f.slot = e.target.value.trim() || "그림"; upd(); } }))),
+            h("datalist", { id: "pic-slots" }, [...slots].map((n) => h("option", { value: n }))),
+            h("p", { class: "hint" }, "같은 '자리 이름'을 쓰는 블록끼리는 그림이 바뀌고, 다른 이름이면 여러 그림이 같이 떠 있어요. 그림을 치우려면 '숨기기'를 고르세요."),
+            h("button", { class: "btn wide", onclick: () => previewBlock(fromForm("varimg", f)) }, "▶ 이 블록만 미리보기"));
+        }
+        return parts;
       }
       case "minigame": {
         const o = f.objects[f.active] || f.objects[0];
@@ -1830,6 +1881,14 @@
         h("b", {}, n), h("small", {}, `${FX_SHAPES[d.shape] || d.shape}${d.dir != null ? ` · ${dirArrow(d.dir)}` : ""}`), fxSwatch(d))),
       h("button", { class: "fx-card add", onclick: () => effectSheet(null) }, "+ 새 효과 만들기")));
 
+    w.append(h("h3", { class: "sec" }, "🧩 변수 그림"),
+      h("p", { class: "hint" }, "[변수 그림] 블록의 '화면 위 그림'에서 쓰는 그림이에요. 화면 어디에든, 원하는 크기로 띄울 수 있어요 (예: 상태 아이콘, 말풍선, 쪽지, 표정 이모티콘)."));
+    w.append(h("div", { class: "thumbs" },
+      Object.entries(proj.pics).map(([n, ref]) => h("button", { class: "thumb char", onclick: () => bgSheet(n, "pics") },
+        h("div", { class: "pic", style: { backgroundImage: `url("${imgSrc(ref)}")`, backgroundPosition: "center" } }),
+        h("div", { class: "cap" }, h("b", {}, n), h("small", {}, `image: "${n}"`)))),
+      h("button", { class: "thumb add", onclick: () => bgSheet(null, "pics") }, "+ 변수 그림 추가")));
+
     w.append(h("h3", { class: "sec" }, "오브젝트 그림"),
       h("p", { class: "hint" }, "미니게임에서 일러스트 위에 놓을 물건 그림이에요 (편지, 열쇠, 선물 등). 흰 배경은 자동으로 지울 수 있어요."));
     w.append(h("div", { class: "thumbs" },
@@ -1956,7 +2015,7 @@
   // 배경 / 이벤트 그림 편집 (map: "backgrounds" 또는 "cgs")
   function bgSheet(name, map) {
     map = map || "backgrounds";
-    const isBg = map === "backgrounds", isItem = map === "items";
+    const isBg = map === "backgrounds", isItem = map === "items" || map === "pics";
     const white = { on: true };
     const M = proj[map];
     const isNew = name == null;
@@ -1980,7 +2039,8 @@
       if (!isNew && v !== name) {
         delete M[name];
         eachBlock((b) => {
-          if (b && b.minigame) { if (b.image === name) b.image = v; (b.objects || []).forEach((o) => { if (isItem && o.item === name) o.item = v; }); }
+          if (b && b.minigame && map !== "pics") { if (b.image === name) b.image = v; (b.objects || []).forEach((o) => { if (map === "items" && o.item === name) o.item = v; }); }
+          if (b && map === "pics" && b.varImage === "pic") { (b.cases || []).forEach((c) => { if (c.image === name) c.image = v; }); if (b.else === name) b.else = v; }
           if (b && b[key] === name) b[key] = v;
           if (b && key === "cg" && Array.isArray(b.cgSeq)) b.cgSeq.forEach((st) => { if (st.image === name) st.image = v; });
           if (b && b.varImage === key) { (b.cases || []).forEach((c) => { if (c.image === name) c.image = v; }); if (b.else === name) b.else = v; }
@@ -1998,7 +2058,7 @@
       } }, "삭제");
       foot.push(del);
     }
-    const label = isBg ? "배경" : isItem ? "오브젝트 그림" : "이벤트 그림";
+    const label = isBg ? "배경" : map === "pics" ? "변수 그림" : isItem ? "오브젝트 그림" : "이벤트 그림";
     openSheet(`${label} ${isNew ? "추가" : "편집"}`, [prev, whiteBox, up, field("이름 (스토리에서 부를 이름)", nameIn), err], foot);
   }
 
@@ -2399,6 +2459,7 @@
     for (const k of Object.keys(P.backgrounds)) P.backgrounds[k] = await conv(P.backgrounds[k]);
     for (const k of Object.keys(P.cgs || {})) P.cgs[k] = await conv(P.cgs[k]);
     for (const k of Object.keys(P.items || {})) P.items[k] = await conv(P.items[k]);
+    for (const k of Object.keys(P.pics || {})) P.pics[k] = await conv(P.pics[k]);
     for (const k of Object.keys(P.sounds || {})) P.sounds[k] = await conv(P.sounds[k]);
     for (const c of Object.values(P.characters)) for (const k of Object.keys(c.faces || {})) c.faces[k] = await conv(c.faces[k]);
     return P;

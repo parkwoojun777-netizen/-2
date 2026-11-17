@@ -308,3 +308,10 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .sig-banner { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--r); background: color-mix(in srgb, #f5b800 14%, var(--surface)); border: 1px solid color-mix(in srgb, #f5b800 45%, var(--line)); }
 .sig-banner b { font-size: 15px; } .sig-banner span { font-size: 13px; color: var(--muted); }
 .block.k-signal, .picker .k-signal { --kc: #d99a00; }
+
+/* 🧩 변수 그림 위치 고르기 */
+.pic-box { aspect-ratio: 16 / 9; background-color: #1b2131; }
+.pic-box.portrait { aspect-ratio: 9 / 16; max-width: 300px; align-self: center; width: 100%; }
+.pic-box .pic-pv { position: absolute; transform: translate(-50%, -50%); pointer-events: none; outline: 2px dashed rgba(255,255,255,.85); outline-offset: 2px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.45)); }
+.pic-box .pic-pv:not([src]), .pic-box .pic-pv[src=""] { width: 40px !important; height: 40px; background: rgba(255,255,255,.3); border-radius: 8px; }
+.pic-box-text { position: absolute; left: 4%; right: 4%; bottom: 3%; height: 22%; border-radius: 8px; background: rgba(14,18,32,.55); border: 1px solid rgba(160,200,255,.3); pointer-events: none; }

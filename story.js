@@ -29,6 +29,8 @@
    { bgm: "교실의오후", fade: 2 }  /  { bgm: "" } → 배경음악 틀기 / 끄기 (반복 재생)
    { act: "charlotte", motion: "tremble" } → 캐릭터 움직임: hop nod shake jolt sway (한 번) ·
                                           tremble shiver breathe float stop (계속) · down sink up closer away tilt fade reset (자세)
+   { varImage: "pic", slot: "기분", x: 74, y: 26, w: 18, cases: [ … ], else: "기분_보통" }
+                                        → 🧩 변수 그림: pics 의 그림을 화면 어디에나 (x·y %, 너비 w %, layer back/front/top, anim fade/pop/drop/slide)
    { signal: "깜짝" }                    → ⚡ 시그널 보내기 (story 의 "⚡깜짝" 블록들이 실행되고 돌아와요)
                                           watches: [{ if: "호감도 >= 4", signal: "…", once: true }] 로 자동 보내기
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
@@ -69,6 +71,13 @@ const PROJECT = {
   cgs: {
     추억_교실: "images/cg/cg_classroom.jpg",
     추억_윙크: "images/cg/cg_wink.jpg",
+  },
+
+  // 🧩 변수 그림 (화면 위 어디에나 띄우는 그림): 이름 → 그림
+  pics: {
+    기분_보통: "images/pic/mood_plain.png",
+    기분_좋음: "images/pic/mood_good.png",
+    기분_최고: "images/pic/mood_best.png",
   },
 
   // 효과음: 이름 → 소리 파일
@@ -170,7 +179,11 @@ const PROJECT = {
           { name: "고양이 스티커", x: 12, y: 45, size: 9, hidden: true, say: "샬럿", text: "그걸 어떻게 찾았어? 내 보물인데.", set: { 호감도: +2 } },
         ] },
       { varImage: "charlotte", cases: [ { if: "호감도 >= 2", image: "smile" } ], else: "normal" },
+      // 🧩 화면 위 그림: 호감도에 따라 샬럿 옆 말풍선이 바뀌어요 (자리 "기분", 오른쪽 위, 화면 너비의 18%)
+      { varImage: "pic", slot: "기분", x: 74, y: 26, w: 18, layer: "front", anim: "pop",
+        cases: [ { if: "호감도 >= 3", image: "기분_최고" }, { if: "호감도 >= 1", image: "기분_좋음" } ], else: "기분_보통" },
       "샬럿: 있잖아. 내일 시간 있어?",
+      { varImage: "pic", slot: "기분", else: "" },
       { choice: [
         { text: "있어.", goto: "약속", set: { 호감도: +1 } },
         { text: "글쎄, 왜?", goto: "판정" },

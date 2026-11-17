@@ -16,6 +16,18 @@
   .vn-cg{position:absolute;inset:0;background:#000 center/contain no-repeat;opacity:0;transition:opacity .5s;pointer-events:none}
   .vn-cg.cover{background-size:cover}.vn-cg.on{opacity:1}
   .vn-cg2{transition:none}
+  .vn-pics{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .vn-pics[data-layer="top"]{z-index:2}
+  .vn-pic{position:absolute;transform:translate(-50%,-50%);max-width:none;transition:opacity .4s,left .5s,top .5s,width .5s;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+  .vn-pic.out{opacity:0}
+  .vn-pic.a-fade{animation:vn-pic-fade .5s both}
+  .vn-pic.a-pop{animation:vn-pic-pop .45s cubic-bezier(.3,1.6,.5,1) both}
+  .vn-pic.a-drop{animation:vn-pic-drop .6s cubic-bezier(.3,1.3,.5,1) both}
+  .vn-pic.a-slide{animation:vn-pic-slide .5s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes vn-pic-fade{from{opacity:0}}
+  @keyframes vn-pic-pop{from{opacity:0;transform:translate(-50%,-50%) scale(.3)}}
+  @keyframes vn-pic-drop{from{opacity:0;transform:translate(-50%,-180%)}}
+  @keyframes vn-pic-slide{from{opacity:0;transform:translate(30%,-50%)}}
   .vn-taphint{position:absolute;z-index:3;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));padding:8px 14px;border-radius:999px;background:rgba(10,14,26,.65);border:1px solid var(--vn-line);color:var(--vn-accent);font-size:13px;font-weight:700;pointer-events:none;animation:vn-blink 1.1s infinite}
   .vn-bg{position:absolute;inset:0;background:#111 center/cover no-repeat}
   .vn-bg2{opacity:0}
@@ -208,7 +220,9 @@
   <div class="vn-stage">
     <div class="vn-scene">
       <div class="vn-bg"></div><div class="vn-bg vn-bg2"></div>
+      <div class="vn-pics" data-layer="back"></div>
       <div class="vn-chars"></div>
+      <div class="vn-pics" data-layer="front"></div>
       <div class="vn-cg"></div><div class="vn-cg vn-cg2"></div>
     </div>
     <div class="vn-tintfx"></div>
@@ -216,6 +230,7 @@
     <div class="vn-choices" hidden></div>
     <div class="vn-mg" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
+    <div class="vn-pics" data-layer="top"></div>
     <div class="vn-taphint" hidden>▼ 탭</div>
     <div class="vn-hud" data-pos="tl"></div>
     <div class="vn-menu">
@@ -312,6 +327,7 @@
     const SFX_KEY = "vn_sfx_volume";
     const BGM_KEY = "vn_bgm_volume";
     const SOUNDS = P.sounds || {};    // 효과음: 이름 → 소리 파일
+    const PICS = P.pics || {};        // 변수 그림(화면 위 그림): 이름 → 그림
 
     let replay = null; // 회상방에서 다시 보는 장면
     let S = null, typing = null, waitingTap = false, auto = false, skip = false, autoTimer = null, dead = false;
@@ -1198,6 +1214,36 @@
     }
 
     // ---------- 변수 그림: 변수 값에 따라 다른 그림 ----------
+    // 🧩 화면 위 그림: 자리(slot)마다 한 장. 위치 x·y(화면 %, 그림 가운데 기준) · 너비 w(화면 너비 %) · 층 · 나타나기
+    function setPic(slot, name, o) {
+      S.pics = S.pics || {};
+      slot = slot || "그림";
+      if (!name) delete S.pics[slot];
+      else S.pics[slot] = { image: name, x: o.x == null ? 50 : +o.x, y: o.y == null ? 50 : +o.y, w: o.w == null ? 25 : +o.w, layer: o.layer || "front", anim: o.anim || "fade" };
+      renderPics(false, slot);
+    }
+    function renderPics(instant, changed) {
+      const want = S.pics || {};
+      R.querySelectorAll(".vn-pic").forEach((im) => {
+        const p = want[im.dataset.slot];
+        if (!p || im.parentNode.dataset.layer !== (p.layer || "front")) { im.classList.add("out"); later(() => im.remove(), instant ? 0 : 400); im.dataset.slot = "__gone"; }
+      });
+      for (const [slot, p] of Object.entries(want)) {
+        const src = img(PICS[p.image] || CGS[p.image] || ITEMS[p.image] || p.image);
+        let im = [...R.querySelectorAll(".vn-pic")].find((x) => x.dataset.slot === slot);
+        const fresh = !im;
+        if (fresh) {
+          im = document.createElement("img"); im.className = "vn-pic"; im.dataset.slot = slot; im.alt = ""; im.draggable = false;
+          (R.querySelector(`.vn-pics[data-layer="${p.layer || "front"}"]`) || R.querySelector(".vn-pics")).appendChild(im);
+        }
+        if (im.getAttribute("src") !== src) {
+          im.src = src;
+          if (!instant && (fresh || changed === slot) && p.anim && p.anim !== "none") { im.classList.remove("a-fade", "a-pop", "a-drop", "a-slide"); void im.offsetWidth; im.classList.add("a-" + p.anim); }
+        }
+        Object.assign(im.style, { left: p.x + "%", top: p.y + "%", width: p.w + "%" });
+      }
+    }
+
     function applyVarImage(c) {
       const hit = (c.cases || []).find((x) => evalCond(x.if));
       const im = hit ? hit.image : c.else;
@@ -1205,6 +1251,7 @@
       const t = c.varImage;
       if (t === "bg") { if (im) setBg(im); }
       else if (t === "cg") setCg(im, c.fit);
+      else if (t === "pic") setPic(c.slot, im, c);
       else if (CHARS[t]) {
         const prev = S.chars[t] || {};
         S.chars[t] = Object.assign({}, prev, { face: im || prev.face || "normal", pos: c.pos || prev.pos || "center" });
@@ -1362,6 +1409,7 @@
       el.chars.innerHTML = "";
       el.bg.style.backgroundImage = ""; el.bg2.style.opacity = 0;
       el.cg.classList.remove("on"); el.cg2.style.opacity = 0; el.tapHint.hidden = true;
+      R.querySelectorAll(".vn-pic").forEach((x) => x.remove());
       mgClear(); el.mg.hidden = true; el.mg.innerHTML = "";
       pfxStop(); el.scene.dataset.tint = ""; el.tintfx.dataset.tint = "";
       if (!scene) replay = null;
@@ -1370,6 +1418,7 @@
         S.index = S.lineIndex; S.log = S.log || [];
         if (S.bg) setBg(S.bg, true);
         setCg(S.cg, S.cgFit);
+        renderPics(true);
         setTint(S.tint);
         // 예전 저장 파일은 효과 하나, 새 저장 파일은 여러 개
         [].concat(S.pfx || []).forEach((c) => particles(c));
