@@ -979,7 +979,7 @@
   // 소리 파일 고르기 → 효과음 목록에 넣고 이름을 돌려줘요
   function soundInput(label, onAdd) {
     const status = h("div", { class: "img-status" });
-    return h("div", { class: "img-in" }, fileButton(label || "🔊 소리 파일 고르기 (mp3 · wav · ogg)", "audio/*", async (file) => {
+    const handle = async (file) => {
       if (file.type && !file.type.startsWith("audio/")) { status.className = "img-status err"; status.textContent = "소리 파일이 아니에요."; return; }
       if (file.size > 15 * 1048576) { status.className = "img-status err"; status.textContent = "15MB 보다 작은 파일을 써 주세요. (배경음악은 mp3 로 줄이면 좋아요)"; return; }
       status.className = "img-status"; status.textContent = "넣는 중…";
@@ -991,7 +991,8 @@
         status.textContent = `✅ 「${n}」 을(를) 넣었어요`;
         onAdd(n);
       } catch (e) { status.className = "img-status err"; status.textContent = e.message; }
-    }, "wide"), status);
+    };
+    return h("div", { class: "img-in" }, fileButton(label || "🔊 소리 파일 고르기 (mp3 · wav · ogg)", "audio/*", handle, "wide"), inboxPicker("audio", handle), status);
   }
   function soundSheet(name) {
     const nameIn = h("input", { type: "text", value: name });
@@ -1848,6 +1849,10 @@
 
   // ===== 그림 탭 =====
   function renderAssets(w) {
+    w.append(h("div", { class: "card inbox-card" },
+      h("b", {}, "📥 보관함"),
+      h("p", { class: "hint" }, "사진첩이 안 열리면, 그림이나 소리를 이 채팅으로 Claude 에게 보내 주세요. 보관함에 넣어 드리면 어느 [사진첩에서 고르기] 옆에서든 [📥 보관함에서 고르기]로 가져올 수 있어요."),
+      inboxPicker("image", () => toast("그림을 넣을 곳(배경 · 캐릭터 · 이벤트 그림 …)에서 [📥 보관함에서 고르기]를 눌러 주세요"))));
     w.append(h("h3", { class: "sec" }, "배경"),
       h("p", { class: "hint" }, "가로로 긴 그림이 좋아요. 폰 세로 화면에서는 가운데가 보여요."));
     w.append(h("div", { class: "thumbs" },
@@ -1927,6 +1932,45 @@
     return h("label", { class: "btn filebtn " + (cls || "") }, h("span", {}, label), input);
   }
   // 그림 고르기 + 붙여넣기 + 진행 상태
+  // ===== 📥 보관함 =====
+  // 사진첩이 안 열리는 앱 화면을 위한 길: 채팅으로 Claude 에게 보낸 그림 · 소리를 inbox/ 에 넣어 두면 여기서 바로 가져와요.
+  let inboxItems = null;
+  async function loadInbox() {
+    if (inboxItems) return inboxItems;
+    try {
+      const r = await fetch("inbox/inbox.json", { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const j = await r.json();
+      inboxItems = (Array.isArray(j.items) ? j.items : []).filter((x) => x && x.file);
+    } catch (e) { inboxItems = []; }
+    return inboxItems;
+  }
+  async function inboxFile(item) {
+    const r = await fetch(item.file);
+    if (!r.ok) throw new Error("보관함 파일을 읽지 못했어요");
+    const blob = await r.blob();
+    const ext = (item.file.match(/\.(\w+)$/) || [, "png"])[1];
+    return new File([blob], `${item.name || "보관함"}.${ext}`, { type: blob.type || (item.type === "audio" ? "audio/mpeg" : "image/png") });
+  }
+  // 버튼을 누르면 그 자리에 보관함 목록이 펼쳐져요 (편집 중인 창을 닫지 않아요)
+  function inboxPicker(type, onFile) {
+    const list = h("div", { class: "inbox-grid", hidden: true });
+    const btn = h("button", { class: "btn wide inbox-btn", onclick: async (e) => {
+      e.preventDefault();
+      if (!list.hidden) { list.hidden = true; return; }
+      list.hidden = false; list.innerHTML = ""; list.append(h("span", { class: "hint" }, "불러오는 중…"));
+      const items = (await loadInbox()).filter((x) => (x.type || "image") === type);
+      list.innerHTML = "";
+      if (!items.length) { list.append(h("p", { class: "hint" }, type === "audio" ? "보관함에 소리가 없어요. 이 채팅으로 Claude 에게 소리 파일을 보내 주세요." : "보관함이 비어 있어요. 이 채팅으로 Claude 에게 그림을 보내 주시면 여기에 넣어 드려요.")); return; }
+      items.forEach((it) => list.append(h("button", { class: "inbox-item", onclick: async (ev) => {
+        ev.preventDefault();
+        try { onFile(await inboxFile(it)); list.hidden = true; } catch (er) { toast(er.message); }
+      } }, type === "audio" ? h("span", { class: "inbox-audio" }, "🔊") : h("span", { class: "inbox-thumb", style: { backgroundImage: `url("${it.file}")` } }), h("small", {}, it.name || "이름 없음"))));
+    } }, type === "audio" ? "📥 보관함에서 소리 고르기" : "📥 보관함에서 그림 고르기");
+    return h("div", { class: "inbox-pick" }, btn, list);
+  }
+  const pickerHelp = () => h("p", { class: "hint picker-help" }, "사진첩이 안 열리면: ① 이 채팅으로 Claude 에게 그림을 보내 주세요 → 📥 보관함에 넣어 드려요 ② 또는 폰의 크롬 · 사파리에서 이 페이지를 열면 사진첩이 열려요.");
+
   function imageInput(opts, onRef) {
     const status = h("div", { class: "img-status" });
     const say = (t, bad) => { status.className = "img-status" + (bad ? " err" : ""); status.textContent = t; };
@@ -1948,11 +1992,11 @@
         const it = [...((e.clipboardData && e.clipboardData.items) || [])].find((i) => i.kind === "file" && i.type.startsWith("image/"));
         if (it) handle(it.getAsFile()); else say("붙여넣은 내용에 그림이 없어요. 그림 자체를 복사해 주세요.", true);
       } });
-    return h("div", { class: "img-in" }, fileButton(opts.label || "🖼 사진첩에서 그림 고르기", "image/*", handle, "wide" + (opts.primary ? " primary" : "")), paste, status);
+    return h("div", { class: "img-in" }, fileButton(opts.label || "🖼 사진첩에서 그림 고르기", "image/*", handle, "wide" + (opts.primary ? " primary" : "")), inboxPicker("image", handle), paste, status, pickerHelp());
   }
   // 사진 파일 이름(IMG_1234 같은 것)은 의미가 없어서 "배경", "그림" 같은 이름을 대신 써요
   function fileBase(file, fallback) {
-    const n = ((file && file.name) || "").replace(/\.[^.]+$/, "").replace(/[^\w가-힣]/g, "_").replace(/^_+|_+$/g, "").slice(0, 20);
+    const n = ((file && file.name) || "").replace(/\.[^.]+$/, "").replace(/[^\w가-힣]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20);
     return !n || /\d{3,}|image|img|photo|screenshot|스크린샷|사진/i.test(n) ? fallback : n;
   }
   function uniqueName(map, base) {

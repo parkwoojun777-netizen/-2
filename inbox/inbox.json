@@ -1,0 +1,35 @@
+{
+  "note": "Claude 에게 채팅으로 보낸 그림 · 소리를 여기에 넣어요",
+  "items": [
+    {
+      "name": "교실 배경",
+      "file": "inbox/classroom.jpg",
+      "type": "image"
+    },
+    {
+      "name": "샬럿 (기본)",
+      "file": "inbox/charlotte_1.png",
+      "type": "image"
+    },
+    {
+      "name": "샬럿 (윙크)",
+      "file": "inbox/charlotte_2.png",
+      "type": "image"
+    },
+    {
+      "name": "샬럿 (삐짐)",
+      "file": "inbox/charlotte_3.png",
+      "type": "image"
+    },
+    {
+      "name": "샬럿 (부끄러움)",
+      "file": "inbox/charlotte_4.png",
+      "type": "image"
+    },
+    {
+      "name": "띠링 (예시 효과음)",
+      "file": "sounds/chime.wav",
+      "type": "audio"
+    }
+  ]
+}

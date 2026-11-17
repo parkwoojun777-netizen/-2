@@ -315,3 +315,15 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .pic-box .pic-pv { position: absolute; transform: translate(-50%, -50%); pointer-events: none; outline: 2px dashed rgba(255,255,255,.85); outline-offset: 2px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.45)); }
 .pic-box .pic-pv:not([src]), .pic-box .pic-pv[src=""] { width: 40px !important; height: 40px; background: rgba(255,255,255,.3); border-radius: 8px; }
 .pic-box-text { position: absolute; left: 4%; right: 4%; bottom: 3%; height: 22%; border-radius: 8px; background: rgba(14,18,32,.55); border: 1px solid rgba(160,200,255,.3); pointer-events: none; }
+
+/* 📥 보관함 */
+.inbox-pick { display: flex; flex-direction: column; gap: 6px; }
+.inbox-btn { border-style: dashed; }
+.inbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; padding: 8px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.inbox-item { display: flex; flex-direction: column; gap: 4px; align-items: center; padding: 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.inbox-item:active, .inbox-item:hover { border-color: var(--accent); }
+.inbox-thumb { width: 100%; aspect-ratio: 1; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)) center / contain no-repeat; }
+.inbox-audio { font-size: 30px; line-height: 1.6; }
+.inbox-item small { font-size: 11.5px; text-align: center; word-break: keep-all; }
+.picker-help { font-size: 12px; }
+.inbox-card { display: flex; flex-direction: column; gap: 8px; }
