@@ -23,6 +23,9 @@
    { particles: "petal", mode: "spread", dir: 90, spread: 30 } → 방향: 0 위 · 90 오른쪽 · 180 아래 · 270 왼쪽
    { particles: "별가루", mode: "burst" } → effects 에 직접 만든 효과
    { gauge: "호감도", show: false }       → 게이지 보이기/숨기기 (gauges 설정)
+   { cgSeq: [ { image: "추억_교실", text: "…" }, { image: "추억_윙크", sound: "띠링", fx: "flash" } ] }
+                                        → CG 넘기기: 탭할 때마다 그림 · 대사 · 효과음 · 효과 (text 없으면 탭 기다리기)
+   { sound: "띠링" }                     → 효과음 (sounds 에 등록)
    { tint: "sepia" }                    → 화면 색감 (sepia/gray/night/sunset/dream · "" 은 원래대로)
    { goto: "장면" }   { wait: 1000 }   { shake: true }   { flash: "white" }   { fade: "black" }
    { end: "엔딩 이름" }                 → 엔딩
@@ -57,7 +60,15 @@ const PROJECT = {
   },
 
   // 이벤트 그림(CG): 이름 → 이미지
-  cgs: {},
+  cgs: {
+    추억_교실: "images/cg/cg_classroom.jpg",
+    추억_윙크: "images/cg/cg_wink.jpg",
+  },
+
+  // 효과음: 이름 → 소리 파일
+  sounds: {
+    띠링: "sounds/chime.wav",
+  },
 
   // 오브젝트 그림 (미니게임에서 일러스트 위에 놓는 물건): 이름 → 이미지
   items: {},
@@ -150,6 +161,13 @@ const PROJECT = {
       { bg: "classroom" },
       { tint: "sunset" },
       { say: "샬럿", face: "smile", text: "오늘…… 와 줘서 고마워." },
+      // CG 넘기기: 탭할 때마다 그림 · 대사 · 효과음 · 효과가 차례로 바뀌어요
+      { cgSeq: [
+        { image: "추억_교실", text: "노을이 교실을 주황색으로 물들이고 있었다." },
+        { say: "샬럿", text: "……저기, 눈 감아 봐." },
+        { image: "추억_윙크", sound: "띠링", fx: "flash", particles: "별가루" },
+        { say: "샬럿", text: "헤헤. 속았지?" },
+      ] },
       { particles: "sparkle", mode: "burst", x: 50, y: 35 },
       { particles: "petal", mode: "spread", x: 50, y: 35 },
       "그 윙크가, 오래도록 머릿속에서 떠나지 않았다.",

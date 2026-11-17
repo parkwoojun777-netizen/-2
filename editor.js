@@ -81,7 +81,7 @@
   function blankProject() {
     return {
       title: "새 비주얼 노벨", subtitle: "", titleBg: "", start: "시작",
-      vars: {}, gauges: {}, effects: {}, backgrounds: {}, cgs: {}, items: {}, characters: {}, nameColors: { 나: "#ffd27a" },
+      vars: {}, gauges: {}, effects: {}, backgrounds: {}, cgs: {}, items: {}, sounds: {}, characters: {}, nameColors: { 나: "#ffd27a" },
       story: { 시작: ["여기에 첫 문장을 써 보세요.", { end: "THE END" }] },
       memories: [], gallery: true,
       images: {},
@@ -131,6 +131,7 @@
     Object.values(proj.backgrounds).forEach(mark);
     Object.values(proj.cgs).forEach(mark);
     Object.values(proj.items).forEach(mark);
+    Object.values(proj.sounds).forEach(mark);
     Object.values(proj.characters).forEach((c) => Object.values(c.faces || {}).forEach(mark));
     for (const id of Object.keys(proj.images)) if (!used.has(id)) delete proj.images[id];
   }
@@ -143,6 +144,8 @@
     narr:   { label: "나레이션",    desc: "이름 없는 설명 글" },
     bg:     { label: "배경",        desc: "배경 그림을 바꿔요" },
     cg:     { label: "이벤트 그림", desc: "그림을 화면 가득 보여줘요" },
+    cgseq:  { label: "CG 넘기기",   desc: "탭할 때마다 그림·대사·소리·효과" },
+    sound:  { label: "효과음",      desc: "소리 한 번 재생" },
     varimg: { label: "변수 그림",   desc: "변수에 따라 다른 그림" },
     show:   { label: "캐릭터 등장", desc: "등장 / 표정 / 위치" },
     hide:   { label: "캐릭터 퇴장", desc: "화면에서 사라져요" },
@@ -166,6 +169,8 @@
     if (typeof b === "string") return SAY_RE.test(b) ? "say" : "narr";
     if (!b || typeof b !== "object") return "raw";
     if (isGroup(b)) return "group";
+    if (Array.isArray(b.cgSeq)) return "cgseq";
+    if (b.sound !== undefined) return "sound";
     if (b.minigame) return b.minigame === "pick" ? "minigame" : "raw"; // 예전 미니게임은 코드 블록으로 보여줘요
     if (b.particles !== undefined) return "particles";
     if (b.tint !== undefined) return "tint";
@@ -262,6 +267,8 @@
       case "particles": return b.particles === "off" ? { shape: "off", only: b.only || "", mode: "fall", color: PCOLOR.petal, x: 50, y: 40, amount: 2 }
         : { shape: b.particles, mode: b.mode || "fall", color: (b.color || PCOLOR[b.particles] || "#ffffff").toLowerCase(), dir: b.dir == null ? null : b.dir, spread: b.spread == null ? null : b.spread, x: b.x == null ? 50 : b.x, y: b.y == null ? 40 : b.y, amount: b.amount || 2 };
       case "tint": return { tint: b.tint || "" };
+      case "sound": return { sound: b.sound, volume: b.volume == null ? 1 : b.volume };
+      case "cgseq": return { fit: b.fit || "contain", after: b.after || "hide", steps: b.cgSeq.map((st) => Object.assign(newStep(), clone(st))) };
       case "gauge": return { name: b.gauge, show: b.show !== false };
       case "varimg": return {
         target: b.varImage, fit: b.fit || "contain",
@@ -308,6 +315,13 @@
         return o;
       }
       case "tint": return { tint: f.tint };
+      case "sound": return +f.volume === 1 ? { sound: f.sound } : { sound: f.sound, volume: +f.volume };
+      case "cgseq": {
+        const o = { cgSeq: f.steps.map((st) => { const r = {}; for (const k of ["image", "say", "text", "sound", "fx", "particles"]) if (st[k]) r[k] = st[k]; return r; }) };
+        if (f.fit === "cover") o.fit = "cover";
+        if (f.after === "keep") o.after = "keep";
+        return o;
+      }
       case "gauge": return f.show ? { gauge: f.name } : { gauge: f.name, show: false };
       case "varimg": {
         const o = { varImage: f.target, cases: f.cases.filter((c) => c.var).map((c) => ({ if: `${c.var} ${c.op} ${c.val}`, image: c.image })) };
@@ -371,6 +385,8 @@
         objects: [Object.assign(newObj(1, 35, 60), { var: vars[0] || "" }), Object.assign(newObj(2, 65, 60), { var: vars[0] || "" })], active: 0 };
       case "particles": return { shape: "petal", mode: "spread", color: PCOLOR.petal, x: 50, y: 40, amount: 2 };
       case "tint": return { tint: "sepia" };
+      case "sound": return { sound: Object.keys(proj.sounds)[0] || "", volume: 1 };
+      case "cgseq": { const c = Object.keys(proj.cgs)[0] || ""; return { fit: "contain", after: "hide", steps: [Object.assign(newStep(), { image: c }), newStep()] }; }
       case "gauge": return { name: Object.keys(proj.gauges)[0] || "all", show: true };
       case "choice": return { options: [{ text: "", goto: "", var: "", op: "+", val: "1", if: "" }, { text: "", goto: "", var: "", op: "+", val: "1", if: "" }] };
     }
@@ -398,6 +414,10 @@
         [h("span", { style: { display: "inline-block", width: "12px", height: "12px", borderRadius: "50%", background: f.color, marginRight: "6px", verticalAlign: "-1px", border: "1px solid var(--line)" } }),
           `${PSHAPE[f.shape] || "🎨 " + f.shape} · ${PMODE[f.mode].split(" (")[0]}${f.mode !== "fall" ? ` (${Math.round(f.x)}%, ${Math.round(f.y)}%)` : ""}${f.dir != null ? ` · ${dirArrow(f.dir)} ${dirName(f.dir)}` : ""}`];
       case "tint": return `🎨 ${TINTS[f.tint] || f.tint}`;
+      case "sound": return `🔊 ${f.sound || "(없음)"}${+f.volume !== 1 ? ` · 크기 ${Math.round(f.volume * 100)}%` : ""}`;
+      case "cgseq": return [h("div", {}, `🎞 CG 넘기기 · 탭 ${f.steps.length}번`),
+        f.steps.slice(0, 4).map((st, j) => h("div", { class: "opt" }, `${j + 1}. ${st.image ? "🖼 " + st.image + " " : ""}${st.sound ? "🔊 " : ""}${st.fx || st.particles ? "✨ " : ""}${st.text ? (st.say ? st.say + ": " : "") + st.text.slice(0, 24) : "(탭)"}`)),
+        f.steps.length > 4 ? h("div", { class: "opt" }, `… ${f.steps.length - 4}단계 더`) : null];
       case "gauge": return `📊 ${f.name === "all" ? "모든 게이지" : (proj.gauges[f.name] && proj.gauges[f.name].label) || f.name} ${f.show ? "보이기" : "숨기기"}`;
       case "varimg": return [h("div", {}, `${targetName(f.target)} 바꾸기`),
         f.cases.map((c) => h("div", { class: "opt" }, `▸ ${c.var} ${c.op} ${c.val} 이면 → ${c.image || "숨기기"}`)),
@@ -481,6 +501,12 @@
         }
         if (k === "bg" && !proj.backgrounds[f.bg]) out.push(`${at}: 배경 "${f.bg}" 이 없어요.`);
         if (k === "cg" && f.cg && !proj.cgs[f.cg]) out.push(`${at}: 이벤트 그림 "${f.cg}" 이 없어요.`);
+        if (k === "sound" && !proj.sounds[f.sound]) out.push(`${at}: 효과음 "${f.sound}" 이 없어요.`);
+        if (k === "cgseq") f.steps.forEach((st, j) => {
+          if (st.image && !proj.cgs[st.image]) out.push(`${at} CG 넘기기 ${j + 1}번: 그림 "${st.image}" 이 없어요.`);
+          if (st.sound && !proj.sounds[st.sound]) out.push(`${at} CG 넘기기 ${j + 1}번: 효과음 "${st.sound}" 이 없어요.`);
+          if (j === 0 && !st.image) out.push(`${at} CG 넘기기: 첫 단계에 그림을 골라 주세요.`);
+        });
         if (k === "particles" && f.shape !== "off" && PCOLOR[f.shape] === undefined && !proj.effects[f.shape]) out.push(`${at}: 입자 효과 "${f.shape}" 이 없어요.`);
         if (k === "gauge" && f.name !== "all" && !proj.gauges[f.name]) out.push(`${at}: "${f.name}" 게이지가 없어요. [변수] 탭에서 켜 주세요.`);
         if ((k === "show" || k === "hide") && f.id !== "all" && !proj.characters[f.id]) out.push(`${at}: 캐릭터 "${f.id}" 이 없어요.`);
@@ -891,6 +917,117 @@
   }
   function uniqueEffect(base) { let n = base, i = 2; while (proj.effects[n]) n = `${base} ${i++}`; return n; }
 
+  // ===== 🔊 효과음 =====
+  function readDataUrl(file) {
+    return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(new Error("파일을 읽지 못했어요")); fr.readAsDataURL(file); });
+  }
+  let testAudio = null;
+  function playTest(name, vol) {
+    try {
+      if (testAudio) testAudio.pause();
+      const src = imgSrc(proj.sounds[name] || "");
+      if (!src) return toast("없는 효과음이에요");
+      testAudio = new Audio(src); testAudio.volume = Math.max(0, Math.min(1, vol == null ? 1 : +vol));
+      const p = testAudio.play(); if (p && p.catch) p.catch(() => toast("이 화면에서는 소리를 낼 수 없어요"));
+    } catch (e) { toast("소리를 재생하지 못했어요"); }
+  }
+  // 소리 파일 고르기 → 효과음 목록에 넣고 이름을 돌려줘요
+  function soundInput(label, onAdd) {
+    const status = h("div", { class: "img-status" });
+    return h("div", { class: "img-in" }, fileButton(label || "🔊 소리 파일 고르기 (mp3 · wav · ogg)", "audio/*", async (file) => {
+      if (file.type && !file.type.startsWith("audio/")) { status.className = "img-status err"; status.textContent = "소리 파일이 아니에요."; return; }
+      if (file.size > 3 * 1048576) { status.className = "img-status err"; status.textContent = "3MB 보다 작은 짧은 효과음을 써 주세요."; return; }
+      status.className = "img-status"; status.textContent = "넣는 중…";
+      try {
+        const ref = addImage(await readDataUrl(file));
+        const base = fileBase(file, "효과음");
+        const n = uniqueName(proj.sounds, base);
+        proj.sounds[n] = ref; changed({ render: false });
+        status.textContent = `✅ 「${n}」 을(를) 넣었어요`;
+        onAdd(n);
+      } catch (e) { status.className = "img-status err"; status.textContent = e.message; }
+    }, "wide"), status);
+  }
+  function soundSheet(name) {
+    const nameIn = h("input", { type: "text", value: name });
+    const err = h("p", { class: "hint", style: { color: "var(--danger)" } });
+    const del = h("button", { class: "btn danger", onclick: () => {
+      if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "정말 삭제"; return; }
+      delete proj.sounds[name]; closeSheet(); changed();
+    } }, "삭제");
+    openSheet("효과음", [h("button", { class: "btn wide", onclick: () => playTest(name) }, "▶ 들어보기"), field("이름 (스토리에서 부를 이름)", nameIn), err], [
+      h("button", { class: "btn primary grow", onclick: () => {
+        const v = nameIn.value.trim();
+        if (!v) return (err.textContent = "이름을 써 주세요.");
+        if (v !== name && proj.sounds[v]) return (err.textContent = "같은 이름의 효과음이 있어요.");
+        if (v !== name) {
+          proj.sounds[v] = proj.sounds[name]; delete proj.sounds[name];
+          eachBlock((b) => { if (!b || typeof b !== "object") return; if (b.sound === name) b.sound = v; (b.cgSeq || []).forEach((st) => { if (st.sound === name) st.sound = v; }); });
+        }
+        closeSheet(); changed();
+      } }, "저장"), del]);
+  }
+
+  // ===== 🎞 CG 넘기기: 탭할 때마다 그림 · 대사 · 효과음 · 효과 =====
+  const SEQ_FX = { "": "효과 없음", shake: "화면 흔들기", flash: "하얗게 번쩍", flashRed: "빨갛게 번쩍" };
+  const newStep = () => ({ image: "", say: "", text: "", sound: "", fx: "", particles: "" });
+  function seqForm(f, redraw, upd) {
+    const cgNames = Object.keys(proj.cgs);
+    const speakers = { "": "나레이션 (이름 없이)" };
+    Object.values(proj.characters).forEach((c) => (speakers[c.name] = c.name));
+    Object.keys(proj.nameColors).forEach((n) => (speakers[n] = n));
+    const pOpts = { "": "없음" };
+    Object.entries(PSHAPE).forEach(([v, t]) => (pOpts[v] = t));
+    Object.keys(proj.effects).forEach((n) => (pOpts[n] = "🎨 " + n));
+    const selOf = (val, opts, on) => h("select", { onchange: (e) => on(e.target.value) }, Object.entries(opts).map(([v, t]) => h("option", { value: v, selected: v === (val || "") }, t)));
+    // 이 단계에서 화면에 보일 그림 (비워 두면 앞 단계 그림 그대로)
+    const shownAt = (j) => { for (let k = j; k >= 0; k--) if (f.steps[k].image) return f.steps[k].image; return ""; };
+    const cards = f.steps.map((st, j) => {
+      const showing = shownAt(j);
+      const ref = proj.cgs[showing];
+      return h("div", { class: "opt-card seq-step" },
+        h("div", { class: "row" },
+          h("b", { style: { flex: 1 } }, `탭 ${j + 1}`),
+          h("button", { class: "icon-btn", "aria-label": "위로", disabled: j === 0, onclick: () => { [f.steps[j - 1], f.steps[j]] = [f.steps[j], f.steps[j - 1]]; redraw(); } }, "▲"),
+          h("button", { class: "icon-btn", "aria-label": "아래로", disabled: j === f.steps.length - 1, onclick: () => { [f.steps[j + 1], f.steps[j]] = [f.steps[j], f.steps[j + 1]]; redraw(); } }, "▼"),
+          h("button", { class: "icon-btn", "aria-label": "복제", onclick: () => { f.steps.splice(j + 1, 0, clone(st)); redraw(); } }, "⧉"),
+          f.steps.length > 1 ? h("button", { class: "icon-btn", "aria-label": "빼기", onclick: () => { f.steps.splice(j, 1); redraw(); } }, "✕") : null),
+        h("span", { class: "hint", style: { marginTop: "-4px" } }, st.text ? "대사가 나오고, 탭하면 다음 단계로" : "그림만 보여주고, 탭하면 다음 단계로"),
+        h("div", { class: "seq-top" },
+          h("div", { class: "seq-thumb", style: { backgroundImage: ref ? `url("${imgSrc(ref)}")` : "" } }, ref ? null : h("span", {}, "그림 없음")),
+          h("div", { style: { display: "flex", flexDirection: "column", gap: "6px", flex: 1, minWidth: 0 } },
+            field("그림", selOf(st.image, Object.assign({ "": j === 0 ? "— 골라 주세요 —" : "앞 그림 그대로" }, Object.fromEntries(cgNames.map((n) => [n, n]))), (v) => { st.image = v; redraw(); })),
+            imageInput({ kind: "cg", label: "🖼 새 그림 올리기" }, (r, file) => { const n = uniqueName(proj.cgs, fileBase(file, "CG")); proj.cgs[n] = r; st.image = n; changed({ render: false }); redraw(); }))),
+        h("div", { class: "grid2" },
+          field("말하는 사람", selOf(st.say, speakers, (v) => { st.say = v; upd(); })),
+          field("효과음", selOf(st.sound, Object.assign({ "": "없음" }, Object.fromEntries(Object.keys(proj.sounds).map((n) => [n, "🔊 " + n]))), (v) => { st.sound = v; upd(); if (v) playTest(v); }))),
+        field("대사 (비워 두면 그림만 보여주고 탭을 기다려요)", h("textarea", { value: st.text || "", placeholder: "예: 이 사진…… 기억나?", oninput: (e) => { st.text = e.target.value; upd(); } })),
+        h("div", { class: "grid2" },
+          field("효과", selOf(st.fx, SEQ_FX, (v) => { st.fx = v; upd(); })),
+          field("입자 펑!", selOf(st.particles, pOpts, (v) => { st.particles = v; upd(); }))));
+    });
+    return [
+      h("p", { class: "hint" }, "이벤트 그림을 여러 장 이어서 보여줘요. 플레이어가 탭할 때마다 다음 단계로 넘어가면서 그림이 부드럽게 바뀌고, 대사 · 효과음 · 효과가 나와요."),
+      cgNames.length ? null : h("p", { class: "hint", style: { color: "var(--danger)" } }, "이벤트 그림이 아직 없어요. 아래 단계에서 바로 올리거나 [그림] 탭에서 올려 주세요."),
+      h("div", { class: "grid2" },
+        field("그림 맞추기", selOf(f.fit, { contain: "그림 전체 보이기", cover: "화면 꽉 채우기" }, (v) => { f.fit = v; upd(); })),
+        field("다 보면", selOf(f.after, { hide: "그림을 치우고 계속", keep: "그림을 남겨 두고 계속" }, (v) => { f.after = v; upd(); }))),
+      cards,
+      h("button", { class: "btn dashed wide", onclick: () => { f.steps.push(newStep()); redraw(); } }, "+ 탭 하나 더 (다음 단계)"),
+      Object.keys(proj.sounds).length ? null : h("details", { class: "lesson" }, h("summary", {}, "🔊 효과음 넣기"), h("p", {}, "효과음 파일을 올리면 위의 [효과음]에서 고를 수 있어요."), soundInput(null, () => redraw())),
+      h("button", { class: "btn wide", onclick: () => previewBlock(fromForm("cgseq", f)) }, "▶ 이 블록만 미리보기"),
+    ];
+  }
+  // 블록 하나만 테스트 플레이
+  function previewBlock(block) {
+    const P = clone(proj); P.title = (P.title || "") + " (테스트)";
+    const bgName = Object.keys(proj.backgrounds)[0];
+    P.story = Object.assign({}, P.story, { __블록미리보기: [bgName ? { bg: bgName } : { wait: 1 }, block, { end: "미리보기 끝" }] });
+    const box = $("#player"); box.hidden = false;
+    if (playerInst) playerInst.destroy();
+    playerInst = VN.mount(box, P, { startScene: "__블록미리보기", onExit: stopPlay });
+  }
+
   // ===== 🔀 장면 나누기 · 분기 만들기 · 장면 지도 =====
   function uniqueScene(base) { let n = base, i = 2; while (proj.story[n]) n = `${base} ${i++}`; return n; }
 
@@ -1235,6 +1372,18 @@
         parts.push(h("p", { class: "hint" }, f.mode === "burst" ? "한 번 나오고 끝나요." : "끌 때까지 계속 나와요. 멈추려면 [입자 효과] 블록에서 '끄기'를 넣어 주세요."));
         return parts;
       }
+      case "sound": {
+        const opts = Object.fromEntries(Object.keys(proj.sounds).map((n) => [n, "🔊 " + n]));
+        const volTxt = h("span", {}, `소리 크기 ${Math.round((+f.volume || 0) * 100)}%`);
+        return [
+          Object.keys(opts).length ? field("효과음", sel("sound", opts)) : h("p", { class: "hint" }, "효과음이 아직 없어요. 아래에서 소리 파일을 올려 주세요."),
+          soundInput(null, (n) => { f.sound = n; redraw(); }),
+          h("label", { class: "f" }, volTxt, h("input", { type: "range", min: "0.05", max: "1", step: "0.05", value: f.volume, oninput: (e) => { f.volume = +e.target.value; volTxt.textContent = `소리 크기 ${Math.round(f.volume * 100)}%`; upd(); } })),
+          f.sound ? h("button", { class: "btn", onclick: () => playTest(f.sound, f.volume) }, "▶ 들어보기") : null,
+          h("p", { class: "hint" }, "소리는 플레이어가 화면을 한 번 누른 뒤부터 나와요 (휴대폰 정책). 설정에서 효과음 크기를 바꿀 수 있어요."),
+        ];
+      }
+      case "cgseq": return seqForm(f, redraw, upd);
       case "gauge": {
         const names = Object.keys(proj.gauges);
         if (!names.length) return [h("p", { class: "hint" }, "게이지가 아직 없어요. [변수] 탭에서 숫자 변수의 '📊 게이지로 보여주기'를 켜 주세요.")];
@@ -1466,6 +1615,16 @@
         h("div", { class: "cap" }, h("b", {}, n), h("small", {}, `{ cg: "${n}" }`)))),
       h("button", { class: "thumb add", onclick: () => bgSheet(null, "cgs") }, "+ 이벤트 그림 추가")));
 
+    w.append(h("h3", { class: "sec" }, "🔊 효과음"),
+      h("p", { class: "hint" }, "짧은 소리 파일(mp3 · wav · ogg)을 올리면 [효과음] 블록이나 [CG 넘기기]에서 쓸 수 있어요."));
+    w.append(h("div", { class: "card", style: { display: "flex", flexDirection: "column", gap: "8px" } },
+      Object.keys(proj.sounds).length ? null : h("p", { class: "hint" }, "아직 효과음이 없어요."),
+      Object.keys(proj.sounds).map((n) => h("div", { class: "row sound-row" },
+        h("button", { class: "btn", "aria-label": `${n} 들어보기`, onclick: () => playTest(n) }, "▶"),
+        h("b", { style: { flex: 1 } }, n),
+        h("button", { class: "btn", onclick: () => soundSheet(n) }, "이름 · 삭제"))),
+      soundInput(null, () => render())));
+
     w.append(h("h3", { class: "sec" }, "🎨 내 효과 (입자)"),
       h("p", { class: "hint" }, "모양 · 색 · 방향 · 투명도 · 사라지는 정도까지 직접 정한 입자 효과예요. 스토리의 [입자 효과] 블록에서 골라 써요."));
     w.append(h("div", { class: "fx-list" },
@@ -1625,6 +1784,7 @@
         eachBlock((b) => {
           if (b && b.minigame) { if (b.image === name) b.image = v; (b.objects || []).forEach((o) => { if (isItem && o.item === name) o.item = v; }); }
           if (b && b[key] === name) b[key] = v;
+          if (b && key === "cg" && Array.isArray(b.cgSeq)) b.cgSeq.forEach((st) => { if (st.image === name) st.image = v; });
           if (b && b.varImage === key) { (b.cases || []).forEach((c) => { if (c.image === name) c.image = v; }); if (b.else === name) b.else = v; }
         });
         if (isBg && proj.titleBg === name) proj.titleBg = v;
@@ -1936,9 +2096,11 @@
         '{ particles: "petal", mode: "spread", color: "#ffb7c5", x: 50, y: 35 }\n{ particles: "off" }      // 끄기\n{ tint: "sepia" }         // 회상 색감\n{ tint: "" }              // 원래대로\n\nmemories: [ { scene: "좋은엔딩", title: "노을빛 약속" } ],'),
       L("9. 게이지 · 방향 · 내 효과", "gauges 에 변수 이름을 쓰면 그 변수가 게이지로 보여요. 입자 효과의 dir 은 방향(0 위, 90 오른쪽, 180 아래, 270 왼쪽), spread 는 퍼지는 폭이에요. effects 에 만든 효과는 particles 에 이름을 써서 불러요.",
         'gauges: { 호감도: { icon: "💗", max: 10, color: "#ff6b8b", always: true } },\neffects: { 별가루: { shape: "star", colors: ["#fff3a8"], alpha: 0.9, fadeOut: 0.6, dir: 0, spread: 50 } },\n\n{ particles: "petal", mode: "spread", dir: 90, spread: 30 }  // 오른쪽으로\n{ particles: "별가루", mode: "burst", x: 50, y: 40 }\n{ gauge: "호감도", show: false }                       // 숨기기'),
-      L("10. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
+      L("10. CG 넘기기 · 효과음", "cgSeq 는 탭할 때마다 넘어가는 단계 목록이에요. 단계마다 image(그림) · say/text(대사) · sound(효과음) · fx(효과) · particles(입자)를 넣을 수 있고, text 가 없으면 그림만 보여주고 탭을 기다려요.",
+        'sounds: { 띠링: "img:..." },\n\n{ cgSeq: [\n  { image: "추억1", text: "그날의 교실." },\n  { image: "추억2", sound: "띠링", fx: "flash" },\n  { say: "샬럿", text: "기억나?", particles: "별가루" },\n] }\n\n{ sound: "띠링", volume: 0.6 }'),
+      L("11. 묶음 — 블록 정리하기", "여러 블록을 group 으로 묶으면 창작기에서 접었다 펼 수 있어요. 게임에서는 blocks 안의 블록이 위에서부터 차례대로 실행돼요. 묶음 안에 묶음을 넣을 수도 있어요.",
         '{ group: "아침 인사", blocks: [\n  { bg: "classroom" },\n  "샬럿: 좋은 아침!",\n  "나: 안녕.",\n] },'),
-      L("11. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
+      L("12. 쉼표와 괄호 — 가장 흔한 실수", "목록의 항목 사이에는 꼭 쉼표(,)가 있어야 해요. 여는 괄호와 닫는 괄호의 짝도 맞아야 해요. 에러가 나면 그 줄 근처의 쉼표와 괄호부터 확인하세요.",
         '[\n  "첫 줄",\n  "둘째 줄"   // ← 쉼표가 없으면 에러!\n  "셋째 줄",\n]'));
   }
   async function copy(t) {
@@ -2031,6 +2193,7 @@
     for (const k of Object.keys(P.backgrounds)) P.backgrounds[k] = await conv(P.backgrounds[k]);
     for (const k of Object.keys(P.cgs || {})) P.cgs[k] = await conv(P.cgs[k]);
     for (const k of Object.keys(P.items || {})) P.items[k] = await conv(P.items[k]);
+    for (const k of Object.keys(P.sounds || {})) P.sounds[k] = await conv(P.sounds[k]);
     for (const c of Object.values(P.characters)) for (const k of Object.keys(c.faces || {})) c.faces[k] = await conv(c.faces[k]);
     return P;
   }

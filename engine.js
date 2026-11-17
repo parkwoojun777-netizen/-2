@@ -15,6 +15,8 @@
   .vn-stage{position:absolute;inset:0;overflow:hidden;cursor:pointer}
   .vn-cg{position:absolute;inset:0;background:#000 center/contain no-repeat;opacity:0;transition:opacity .5s;pointer-events:none}
   .vn-cg.cover{background-size:cover}.vn-cg.on{opacity:1}
+  .vn-cg2{transition:none}
+  .vn-taphint{position:absolute;z-index:3;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));padding:8px 14px;border-radius:999px;background:rgba(10,14,26,.65);border:1px solid var(--vn-line);color:var(--vn-accent);font-size:13px;font-weight:700;pointer-events:none;animation:vn-blink 1.1s infinite}
   .vn-bg{position:absolute;inset:0;background:#111 center/cover no-repeat}
   .vn-bg2{opacity:0}
   .vn-chars{position:absolute;inset:0;pointer-events:none}
@@ -188,13 +190,14 @@
     <div class="vn-scene">
       <div class="vn-bg"></div><div class="vn-bg vn-bg2"></div>
       <div class="vn-chars"></div>
-      <div class="vn-cg"></div>
+      <div class="vn-cg"></div><div class="vn-cg vn-cg2"></div>
     </div>
     <div class="vn-tintfx"></div>
     <canvas class="vn-pfx"></canvas>
     <div class="vn-choices" hidden></div>
     <div class="vn-mg" hidden></div>
     <div class="vn-box" hidden><div class="vn-name"></div><div class="vn-text"></div><div class="vn-next">▼</div></div>
+    <div class="vn-taphint" hidden>▼ 탭</div>
     <div class="vn-hud" data-pos="tl"></div>
     <div class="vn-menu">
       <button class="vn-exit" data-a="exit" hidden>✕ 테스트 종료</button>
@@ -248,14 +251,35 @@
     const q = (s) => R.querySelector(s);
     const el = {
       stage: q(".vn-stage"), bg: q(".vn-bg"), bg2: q(".vn-bg2"), chars: q(".vn-chars"),
-      cg: q(".vn-cg"), scene: q(".vn-scene"), tintfx: q(".vn-tintfx"), pfx: q(".vn-pfx"),
+      cg: q(".vn-cg"), cg2: q(".vn-cg2"), tapHint: q(".vn-taphint"), scene: q(".vn-scene"), tintfx: q(".vn-tintfx"), pfx: q(".vn-pfx"),
       gallery: q(".vn-gallery"), galBody: q(".vn-gal-body"), viewer: q(".vn-viewer"), box: q(".vn-box"), name: q(".vn-name"), text: q(".vn-text"), next: q(".vn-next"),
       choices: q(".vn-choices"), mg: q(".vn-mg"), hud: q(".vn-hud"), menu: q(".vn-menu"), fx: q(".vn-fx"), title: q(".vn-title"), ending: q(".vn-ending"),
       panel: q(".vn-panel"), panelTitle: q(".vn-panel-title"), panelBody: q(".vn-panel-body"), toastEl: q(".vn-toast"),
     };
 
     // 묶음 { group, blocks: [...] } 은 안의 블록들을 차례대로 펼쳐서 실행해요
-    const flatten = (l) => (Array.isArray(l) ? l : []).flatMap((b) => (b && typeof b === "object" && !Array.isArray(b) && Array.isArray(b.blocks) && b.group !== undefined ? flatten(b.blocks) : [b]));
+    // CG 넘기기 { cgSeq: [단계...] } 는 단계마다 "그림 → 소리 → 효과 → 대사(없으면 탭 기다리기)" 블록으로 펼쳐요
+    const expandSeq = (b) => {
+      const out = [];
+      b.cgSeq.forEach((st) => {
+        if (!st || typeof st !== "object") return;
+        if (st.image) out.push({ cg: st.image, fit: b.fit });
+        if (st.sound) out.push({ sound: st.sound, volume: st.volume });
+        if (st.fx === "shake") out.push({ shake: true });
+        else if (st.fx === "flash") out.push({ flash: "white" });
+        else if (st.fx === "flashRed") out.push({ flash: "#ff4d6d" });
+        if (st.particles) out.push({ particles: st.particles, mode: "burst", x: st.x == null ? 50 : st.x, y: st.y == null ? 45 : st.y });
+        if (st.text) out.push(st.say ? { say: st.say, text: st.text } : { text: st.text });
+        else out.push({ tap: true });
+      });
+      if (b.after !== "keep") out.push({ cg: "" });
+      return out;
+    };
+    const flatten = (l) => (Array.isArray(l) ? l : []).flatMap((b) => {
+      if (b && typeof b === "object" && !Array.isArray(b) && Array.isArray(b.blocks) && b.group !== undefined) return flatten(b.blocks);
+      if (b && typeof b === "object" && Array.isArray(b.cgSeq)) return expandSeq(b);
+      return [b];
+    });
     const STORY = {};
     for (const [k, l] of Object.entries(P.story || {})) STORY[k] = flatten(l);
     const CHARS = P.characters || {};
@@ -266,6 +290,8 @@
     const SLOTS = 6;
     const SAVE_KEY = "vn_save_" + (P.title || "game");
     const SPEED_KEY = "vn_speed";
+    const SFX_KEY = "vn_sfx_volume";
+    const SOUNDS = P.sounds || {};    // 효과음: 이름 → 소리 파일
 
     let replay = null; // 회상방에서 다시 보는 장면
     let S = null, typing = null, waitingTap = false, auto = false, skip = false, autoTimer = null, dead = false;
@@ -322,6 +348,13 @@
       if (name && CGS[name]) unlock("cg", name);
       S.cg = name || ""; S.cgFit = fit || "";
       const src = name ? img(CGS[name] || name) : "";
+      const was = el.cg.classList.contains("on") ? el.cg.style.backgroundImage : "";
+      // 이벤트 그림끼리 바뀔 때는 부드럽게 겹쳐서 바꿔요
+      if (src && was && was !== `url("${src}")`) {
+        el.cg2.style.transition = "none"; el.cg2.style.backgroundImage = was;
+        el.cg2.className = el.cg.className.replace("vn-cg2", "") + " vn-cg2"; el.cg2.style.opacity = 1;
+        requestAnimationFrame(() => requestAnimationFrame(() => { el.cg2.style.transition = "opacity .6s"; el.cg2.style.opacity = 0; }));
+      }
       if (src) el.cg.style.backgroundImage = `url("${src}")`;
       el.cg.classList.toggle("cover", fit === "cover");
       el.cg.classList.toggle("on", !!src);
@@ -368,7 +401,7 @@
 
     // ---------- 텍스트 ----------
     function showLine(name, text) {
-      el.choices.innerHTML = ""; el.choices.hidden = true;
+      el.choices.innerHTML = ""; el.choices.hidden = true; el.tapHint.hidden = true;
       el.box.hidden = false;
       el.name.textContent = name || ""; el.name.hidden = !name;
       el.name.style.color = colorFor(name);
@@ -408,6 +441,7 @@
     function advance() {
       if (!S || !waitingTap) return;
       if (finishTyping()) return;
+      el.tapHint.hidden = true;
       waitingTap = false;
       clearTimeout(autoTimer);
       run();
@@ -505,6 +539,14 @@
         if (cmd.particles !== undefined) particles(cmd);
         if (cmd.tint !== undefined) setTint(cmd.tint);
         if (cmd.gauge !== undefined) showGauge(cmd.gauge, cmd.show !== false);
+        if (cmd.sound) playSound(cmd.sound, cmd.volume);
+        if (cmd.tap) {
+          // 대사 없이 그림만 보여주고 탭을 기다려요
+          el.box.hidden = true; el.choices.hidden = true; el.tapHint.hidden = false;
+          waitingTap = true; clearTimeout(autoTimer);
+          if (skip) autoTimer = later(advance, 80); else if (auto) autoTimer = later(advance, 1800);
+          return;
+        }
         if (cmd.bg) setBg(cmd.bg);
         if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
         if (cmd.show) {
@@ -1213,7 +1255,7 @@
       el.title.hidden = true; el.ending.hidden = true; el.panel.hidden = true;
       el.chars.innerHTML = "";
       el.bg.style.backgroundImage = ""; el.bg2.style.opacity = 0;
-      el.cg.classList.remove("on");
+      el.cg.classList.remove("on"); el.cg2.style.opacity = 0; el.tapHint.hidden = true;
       mgClear(); el.mg.hidden = true; el.mg.innerHTML = "";
       pfxStop(); el.scene.dataset.tint = ""; el.tintfx.dataset.tint = "";
       if (!scene) replay = null;
@@ -1280,13 +1322,28 @@
       el.panelBody.scrollTop = 1e9;
     }
 
+    // ---------- 🔊 효과음 ----------
+    let sfxVolume = load(SFX_KEY, 0.8);
+    function playSound(name, vol) {
+      if (skip || sfxVolume <= 0) return;
+      const src = img(SOUNDS[name] || "");
+      if (!src) return console.warn("없는 효과음:", name);
+      try {
+        const a = new Audio(src);
+        a.volume = Math.max(0, Math.min(1, (vol == null ? 1 : +vol) * sfxVolume));
+        const p = a.play(); if (p && p.catch) p.catch(() => {});
+      } catch (e) {}
+    }
+
     function openSettings() {
       el.panelTitle.textContent = "⚙️ 설정";
       el.panelBody.innerHTML = `
         <label class="vn-setting">글자 속도<input type="range" min="0" max="80" step="4" value="${80 - speed}"></label>
         <p class="vn-hint">오른쪽 끝 = 바로 표시</p>
+        <label class="vn-setting">효과음 크기<input type="range" min="0" max="1" step="0.05" value="${sfxVolume}" class="vn-sfx"></label>
         ${S ? '<button class="vn-slot vn-totitle"><b>타이틀로 돌아가기</b></button>' : ""}`;
       el.panelBody.querySelector("input").oninput = (e) => { speed = 80 - +e.target.value; store(SPEED_KEY, speed); };
+      el.panelBody.querySelector(".vn-sfx").oninput = (e) => { sfxVolume = +e.target.value; store(SFX_KEY, sfxVolume); };
       const tt = el.panelBody.querySelector(".vn-totitle");
       if (tt) tt.onclick = () => {
         if (tt.dataset.armed) return toTitle();
