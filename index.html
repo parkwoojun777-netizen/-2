@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>샬럿의 위기일발 5교시</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#111;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;overflow:hidden;user-select:none}
+#stage{position:relative;width:100vw;height:100dvh;max-width:calc(100dvh*16/9);margin:0 auto;overflow:hidden;background:#222 url(assets/classroom.webp) center/cover}
+#stage.shake{animation:shake .45s}
+@keyframes shake{0%,100%{transform:translate(0)}20%{transform:translate(-8px,4px)}40%{transform:translate(7px,-5px)}60%{transform:translate(-5px,3px)}80%{transform:translate(4px,-2px)}}
+#dim{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .6s;pointer-events:none}
+#sprite{position:absolute;left:50%;bottom:-6%;height:98%;transform:translateX(-50%);transition:opacity .25s;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));pointer-events:none}
+#sprite.wobble{animation:wob .35s infinite}
+@keyframes wob{0%,100%{transform:translateX(-50%) rotate(0)}25%{transform:translateX(-50.6%) rotate(-.5deg)}75%{transform:translateX(-49.4%) rotate(.5deg)}}
+#sprite.hop{animation:hop .5s}
+@keyframes hop{0%,100%{transform:translate(-50%,0)}40%{transform:translate(-50%,-4%)}}
+#hud{position:absolute;top:0;left:0;right:0;padding:max(10px,env(safe-area-inset-top)) 12px 10px;display:flex;gap:10px;align-items:center;background:linear-gradient(#000a,#0000);color:#fff;font-size:13px;font-weight:700}
+.g{flex:1;min-width:0}
+.g label{display:flex;justify-content:space-between;margin-bottom:3px;text-shadow:0 1px 3px #000}
+.bar{height:12px;border-radius:8px;background:#0008;border:1.5px solid #fff9;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:6px;transition:width .5s,background .5s}
+#time{padding:5px 10px;border-radius:14px;background:#0009;white-space:nowrap;border:1.5px solid #fff5}
+#box{position:absolute;left:3%;right:3%;bottom:max(3%,env(safe-area-inset-bottom));min-height:28%;padding:26px 20px 22px;border-radius:16px;background:rgba(28,24,38,.88);border:2px solid #b9a4d8;color:#fff;font-size:clamp(15px,2.4vh + .3vw,21px);line-height:1.65;cursor:pointer;backdrop-filter:blur(3px)}
+#name{position:absolute;top:-16px;left:16px;padding:3px 16px;border-radius:12px;background:#7c5cc4;font-weight:800;font-size:.85em;border:2px solid #d9cbf3}
+#name:empty{display:none}
+#text.think{color:#bfe3ff;font-style:italic}
+#text.narr{color:#e8e2d0}
+#next{position:absolute;right:16px;bottom:8px;font-size:.8em;opacity:.8;animation:bob 1s infinite}
+@keyframes bob{50%{transform:translateY(4px)}}
+#choices{position:absolute;left:0;right:0;top:12%;bottom:34%;display:none;flex-direction:column;justify-content:center;align-items:center;gap:10px;padding:0 6%}
+#choices button,.btn{width:100%;max-width:560px;padding:13px 16px;border-radius:14px;border:2px solid #d9cbf3;background:rgba(60,44,100,.92);color:#fff;font:inherit;font-size:clamp(14px,2.1vh + .3vw,19px);font-weight:700;cursor:pointer;transition:transform .1s,background .15s}
+#choices button:hover,.btn:hover{background:#7c5cc4}
+#choices button:active,.btn:active{transform:scale(.97)}
+#mini{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;align-items:center;gap:16px;background:#000a;color:#fff;text-align:center;padding:0 6%;cursor:pointer}
+#mini h2{font-size:clamp(20px,4vh,34px);text-shadow:0 2px 6px #000}
+#mini p{font-size:clamp(13px,2.2vh,18px);opacity:.9}
+#track{position:relative;width:100%;max-width:560px;height:38px;border-radius:20px;background:#3a1c2c;border:3px solid #fff;overflow:hidden}
+#zone{position:absolute;top:0;bottom:0;background:#49d27f}
+#mark{position:absolute;top:-3px;bottom:-3px;width:8px;margin-left:-4px;background:#fff;border-radius:4px;box-shadow:0 0 8px #fff}
+#pips{font-size:26px;letter-spacing:6px}
+#screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;padding:6%;background:linear-gradient(rgba(20,14,36,.6),rgba(20,14,36,.96) 75%);color:#fff;text-align:center}
+#screen h1{font-size:clamp(26px,5.5vh,50px);line-height:1.25;text-shadow:0 3px 10px #000}
+#screen h1 small{display:block;font-size:.45em;color:#d9cbf3;margin-bottom:6px}
+#screen p{font-size:clamp(14px,2.3vh,19px);line-height:1.6;max-width:560px}
+#screen .rank{font-size:clamp(40px,9vh,80px)}
+#fx{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(0);font-size:clamp(40px,10vh,90px);font-weight:900;color:#ffe066;-webkit-text-stroke:2px #5a3b00;pointer-events:none;white-space:nowrap}
+#fx.pop{animation:pop .9s ease-out}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(.2) rotate(-8deg);opacity:1}40%{transform:translate(-50%,-50%) scale(1.15) rotate(4deg);opacity:1}100%{transform:translate(-50%,-70%) scale(1) rotate(0);opacity:0}}
+@media (min-aspect-ratio:1/1){
+  #sprite{left:27%}
+  #choices{left:46%;right:2%;top:12%;bottom:32%;padding:0 2%}
+}
+@media (max-aspect-ratio:1/1){
+  #sprite{height:74%;bottom:10%}
+  #box{min-height:24%}
+  #choices{top:42%;bottom:27%;justify-content:flex-end;gap:8px}
+  #choices button{padding:10px 14px}
+}
+#mute{position:absolute;right:10px;top:calc(max(10px,env(safe-area-inset-top)) + 44px);width:38px;height:38px;border-radius:50%;border:1.5px solid #fff7;background:#0008;color:#fff;font-size:17px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="stage">
+  <img id="sprite" src="assets/charlotte_normal.webp" alt="샬럿">
+  <div id="dim"></div>
+  <div id="hud">
+    <div class="g"><label><span>💨 압력</span><span id="pv">0</span></label><div class="bar"><i id="pb"></i></div></div>
+    <div class="g"><label><span>👀 의심</span><span id="sv">0</span></label><div class="bar"><i id="sb"></i></div></div>
+    <div id="time">5교시</div>
+  </div>
+  <button id="mute" title="소리">🔊</button>
+  <div id="choices"></div>
+  <div id="box"><div id="name"></div><div id="text"></div><div id="next">▼</div></div>
+  <div id="fx"></div>
+  <div id="mini">
+    <h2 id="mtitle">참아!</h2>
+    <p id="mdesc"></p>
+    <div id="track"><div id="zone"></div><div id="mark"></div></div>
+    <div id="pips"></div>
+    <p>화면을 터치하거나 스페이스바!</p>
+  </div>
+  <div id="screen"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const IMG={normal:'assets/charlotte_normal.webp',nervous:'assets/charlotte_nervous.webp',pain:'assets/charlotte_pain.webp',relief:'assets/charlotte_relief.webp'};
+Object.values(IMG).forEach(s=>{new Image().src=s});
+
+/* ---------- 소리 ---------- */
+let ac=null,muted=false;
+function audio(){ if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}} if(ac&&ac.state==='suspended')ac.resume(); return ac; }
+function tone(type,f0,f1,dur,vol=.15,delay=0){
+  const a=audio(); if(!a||muted)return;
+  const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+delay;
+  o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur+.05);
+}
+const SFX={
+  click(){tone('sine',700,900,.06,.06)},
+  gurgle(){for(let i=0;i<5;i++)tone('sine',90+Math.random()*60,50+Math.random()*40,.16,.2,i*.13)},
+  pip(){tone('square',300,180,.09,.08)},
+  small(){tone('sawtooth',160,110,.18,.14)},
+  big(){ // 코믹 나팔 소리
+    for(let i=0;i<7;i++)tone('sawtooth',120-i*8+Math.random()*25,70+Math.random()*20,.2,.22,i*.15);
+    tone('sawtooth',90,40,.9,.2,1.0)},
+  ok(){tone('triangle',520,780,.12,.12);tone('triangle',780,1040,.16,.12,.12)},
+  bad(){tone('square',220,110,.3,.1)},
+  bell(){[659,523,587,392,392,587,659,523].forEach((f,i)=>tone('sine',f,f,.55,.14,i*.5))},
+  cough(){tone('sawtooth',300,120,.12,.2);tone('sawtooth',280,100,.14,.2,.2)},
+  fanfare(){[523,659,784,1047].forEach((f,i)=>tone('triangle',f,f,.3,.14,i*.14))}
+};
+
+/* ---------- 상태 ---------- */
+let S;
+const clamp=v=>Math.max(0,Math.min(100,v));
+function hud(){
+  $('pv').textContent=S.p;$('sv').textContent=S.s;
+  $('pb').style.width=S.p+'%';$('sb').style.width=S.s+'%';
+  $('pb').style.background=S.p<45?'#6fd08c':S.p<75?'#f2c14e':'#ef5b5b';
+  $('sb').style.background=S.s<45?'#7fb8f0':S.s<75?'#c58af0':'#ef5b9b';
+}
+function face(f){
+  if(!f)f=S.p<40?'normal':S.p<72?'nervous':'pain';
+  const el=$('sprite'); if(!el.src.endsWith(IMG[f])) el.src=IMG[f];
+  el.classList.toggle('wobble',f==='pain');
+}
+function add(dp=0,ds=0){S.p=clamp(S.p+dp);S.s=clamp(S.s+ds);hud();}
+function fx(t){const e=$('fx');e.textContent=t;e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop');}
+function shake(){const e=$('stage');e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake');}
+
+/* ---------- 대사 엔진 ---------- */
+// 줄 형식: [화자, 대사, 옵션]  화자: 'c'=샬럿(말), 't'=샬럿(속마음), 'n'=지문, 그 외=이름 그대로
+let queue=[],typing=null,full='',onDone=null,locked=false;
+function say(lines,done){queue=lines.slice();onDone=done;nextLine();}
+function nextLine(){
+  if(!queue.length){const d=onDone;onDone=null;d&&d();return;}
+  const [who,txt,o={}]=queue.shift();
+  if(o.p||o.s)add(o.p||0,o.s||0);
+  if(o.time)$('time').textContent=o.time;
+  if(o.sfx)SFX[o.sfx]();
+  if(o.fx)fx(o.fx);
+  if(o.shake)shake();
+  face(o.face);
+  if(o.hop){const e=$('sprite');e.classList.remove('hop');void e.offsetWidth;e.classList.add('hop');}
+  const name=$('name'),text=$('text');
+  text.className=who==='t'?'think':who==='n'?'narr':'';
+  name.textContent=who==='c'?'샬럿':who==='t'?'샬럿 (속마음)':who==='n'?'':who;
+  full=who==='t'?'('+txt+')':txt;text.textContent='';$('next').style.visibility='hidden';
+  let i=0;clearInterval(typing);
+  typing=setInterval(()=>{i++;text.textContent=full.slice(0,i);if(i>=full.length)endType();},26);
+}
+function endType(){clearInterval(typing);typing=null;$('text').textContent=full;$('next').style.visibility='visible';}
+function advance(){
+  if(locked)return;
+  if(typing){endType();return;}
+  if(S&&(S.p>=100||S.s>=100)&&!S.over){checkFail();return;}
+  SFX.click();nextLine();
+}
+$('box').addEventListener('click',advance);
+function choose(opts){
+  locked=true;$('next').style.visibility='hidden';
+  const c=$('choices');c.innerHTML='';c.style.display='flex';
+  opts.forEach(([label,fn])=>{
+    const b=document.createElement('button');b.textContent=label;
+    b.onclick=e=>{e.stopPropagation();SFX.click();c.style.display='none';locked=false;fn();};
+    c.appendChild(b);
+  });
+}
+
+/* ---------- 미니게임: 타이밍 맞추기 ---------- */
+let mg=null;
+function mini(title,desc,rounds,cb){
+  locked=true;
+  const hard=S.p/100; // 압력이 높을수록 어렵다
+  mg={rounds,hit:0,done:0,pos:0,dir:1,speed:.9+hard*1.1,zw:Math.max(13,30-hard*16),cb,res:[],raf:0,last:0,wait:false};
+  $('mtitle').textContent=title;$('mdesc').textContent=desc;$('mini').style.display='flex';
+  newZone();pips();mg.last=performance.now();mg.raf=requestAnimationFrame(loop);
+}
+function newZone(){mg.zx=8+Math.random()*(84-mg.zw);$('zone').style.left=mg.zx+'%';$('zone').style.width=mg.zw+'%';$('zone').style.background='#49d27f';}
+function pips(r){let s='';for(let i=0;i<mg.rounds;i++)s+=i<mg.res.length?(mg.res[i]?'⭕':'❌'):'⚪';$('pips').textContent=s;}
+function loop(t){
+  const dt=Math.min(.05,(t-mg.last)/1000);mg.last=t;
+  if(!mg.wait){mg.pos+=mg.dir*mg.speed*100*dt;if(mg.pos>=100){mg.pos=100;mg.dir=-1}if(mg.pos<=0){mg.pos=0;mg.dir=1}
+    $('mark').style.left=mg.pos+'%';}
+  mg.raf=requestAnimationFrame(loop);
+}
+function hitMini(){
+  if(!mg||mg.wait)return;
+  const ok=mg.pos>=mg.zx&&mg.pos<=mg.zx+mg.zw;
+  mg.res.push(ok);ok?SFX.ok():(SFX.pip(),shake());
+  $('zone').style.background=ok?'#b6ffcf':'#ef5b5b';pips();mg.wait=true;
+  setTimeout(()=>{
+    if(mg.res.length>=mg.rounds){
+      cancelAnimationFrame(mg.raf);$('mini').style.display='none';locked=false;
+      const n=mg.res.filter(Boolean).length,cb=mg.cb,r=mg.rounds;mg=null;cb(n,r);
+    }else{mg.speed*=1.12;newZone();mg.wait=false;}
+  },550);
+}
+$('mini').addEventListener('pointerdown',e=>{e.preventDefault();hitMini();});
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='Enter'){e.preventDefault();
+    if(mg)hitMini();else if($('screen').style.display==='none'&&$('choices').style.display!=='flex')advance();}
+});
+
+/* ---------- 이야기 ---------- */
+function start(){
+  S={p:25,s:0,over:false,leaks:0,jiu:0};
+  hud();face('normal');$('screen').style.display='none';$('dim').style.opacity=0;$('time').textContent='점심시간';
+  say([
+    ['n','○○중학교, 점심시간이 끝나갈 무렵.',{face:'normal'}],
+    ['c','후아~ 오늘 급식 진짜 맛있었다! 고구마 맛탕에 콩밥, 그리고 우유까지 두 개나!',{face:'relief'}],
+    ['지우','샬럿, 너 맛탕 세 번 받아먹더라? 괜찮겠어?'],
+    ['c','당연하지! 고구마는 몸에 좋은걸?',{face:'normal'}],
+    ['n','딩동댕동— 5교시 시작을 알리는 종이 울렸다.',{sfx:'bell',time:'5교시 13:10'}],
+    ['수학 선생님','자, 다들 자리에 앉아라. 오늘은 조용~히 문제 풀이 하는 날이다.'],
+    ['n','꾸르르륵…',{sfx:'gurgle',p:15,face:'nervous',fx:'꾸르륵…'}],
+    ['t','어… 어라? 배가… 배가 이상한데…?'],
+    ['t','설마… 고구마에 우유에 콩밥… 최악의 조합이었던 거야?!',{p:5}],
+    ['t','안 돼. 여긴 교실이야. 그것도 세상에서 제일 조용한 수학 시간…!'],
+    ['t','종 칠 때까지 45분. 무슨 일이 있어도 참아내야 해!'],
+  ],scene1);
+}
+function scene1(){
+  say([['t','일단 자세부터 잡자. 어떻게 앉아야 제일 안전하지…?']],()=>choose([
+    ['허리를 꼿꼿이 펴고 다리를 꼰다',()=>say([
+      ['t','좋아, 모범생 자세! 생각보다 안정적이야.',{p:-6,face:'normal'}],
+      ['수학 선생님','오, 샬럿. 오늘 자세가 아주 좋구나.'],
+      ['t','칭찬은 됐으니까 이쪽 보지 말아주세요…!',{s:4}]],scene2)],
+    ['책상에 엎드려 버틴다',()=>say([
+      ['t','으읏… 엎드리니까 배가 눌려서 더 위험하잖아!',{p:12,face:'pain',sfx:'gurgle'}],
+      ['수학 선생님','샬럿, 수업 시간에 자면 안 되지.',{s:6}],
+      ['c','아, 아니에요! 안 잤어요!']],scene2)],
+    ['조용히 복식호흡을 한다',()=>say([
+      ['t','습— 하— 습— 하— 마음을 비우자…',{p:-3}],
+      ['지우','(소곤) 샬럿, 너 왜 출산 호흡 해?',{s:5}],
+      ['c','(소곤) …명상이야, 명상.',{face:'nervous'}]],scene2)],
+  ]));
+}
+function scene2(){
+  say([
+    ['n','10분 경과. 교실에는 사각사각 연필 소리만 가득하다.',{time:'5교시 13:20',p:10}],
+    ['n','꾸륵… 꾸르르륵…',{sfx:'gurgle',fx:'꾸륵…'}],
+    ['수학 선생님','자, 3번 문제. 누가 나와서 풀어볼까… 음, 샬럿!'],
+    ['t','하필 지금?! 일어나면… 걸으면… 큰일 날지도 몰라!',{face:'pain'}],
+  ],()=>choose([
+    ['이를 악물고 칠판까지 걸어 나간다',()=>mini('살금살금 걷기!','초록 구간에서 멈춰서 한 걸음씩 조심히 내딛자',3,(n)=>{
+      if(n===3)say([
+        ['n','샬럿은 닌자처럼 조용히 칠판 앞까지 걸어가 문제를 풀어냈다.',{face:'normal'}],
+        ['수학 선생님','정답! 다들 박수~'],
+        ['t','해… 해냈다! 박수 소리에 묻어서 살짝 뺐어…!',{p:-12,s:-5,face:'relief',sfx:'ok'}]],scene3);
+      else if(n>=1)say([
+        ['n','뽁.',{sfx:'small',fx:'뽁',p:-8,s:14}],
+        ['t','!!! 방금… 아주 작게 샜어…!',{face:'pain'}],
+        ['수학 선생님','음? 누가 실내화 끄는 소리 냈니?'],
+        ['c','시, 실내화가 좀 낡아서요! 하하…',{face:'nervous'}]],()=>{S.leaks++;scene3();});
+      else say([
+        ['n','뿌욱—',{sfx:'small',fx:'뿌욱',shake:true,p:-15,s:30}],
+        ['n','교실 맨 앞줄이 일제히 고개를 들었다.'],
+        ['c','의, 의자! 의자 끄는 소리예요! 진짜로요!',{face:'pain'}],
+        ['t','아무도 안 믿는 눈치야…!']],()=>{S.leaks++;scene3();});
+    })],
+    ['"선생님, 배가 좀 아파서요…"',()=>say([
+      ['c','선생님… 저 배가 좀 아파서 앉아서 대답하면 안 될까요…?',{face:'pain'}],
+      ['수학 선생님','그래? 얼굴이 빨갛긴 하구나. 그럼 앉아서 말해보렴.',{s:10}],
+      ['c','답은… x는 7입니다…!'],
+      ['수학 선생님','정답. 아프면 보건실 가도 된단다.'],
+      ['t','보건실은 복도 끝… 거기까지 걸어갈 자신이 없어…',{p:4}]],scene3)],
+    ['못 들은 척 창밖을 본다',()=>say([
+      ['t','나는 구름이다… 나는 지금 여기 없다…',{face:'normal'}],
+      ['수학 선생님','샬럿? 샬~럿~?'],
+      ['n','선생님이 뚜벅뚜벅 샬럿의 책상 바로 옆까지 걸어왔다.',{p:10,s:12,face:'pain'}],
+      ['t','가까워! 너무 가까워! 지금 터지면 직격탄이야!'],
+      ['c','x, x는 7이요!!'],
+      ['수학 선생님','…정답이긴 한데, 왜 그렇게 소리를 지르니.']],scene3)],
+  ]));
+}
+function scene3(){
+  say([
+    ['n','20분 경과. 고비를 한 번 넘겼지만 뱃속은 점점 더 요란해진다.',{time:'5교시 13:30',p:12,sfx:'gurgle'}],
+    ['n','그때, 짝꿍 지우가 쪽지를 스윽 밀어 넣었다.'],
+    ['지우','(소곤) 이거 봐봐. 진짜 웃겨.'],
+    ['t','웃으면 안 돼… 지금 배에 힘이 풀리면 끝장이야…!',{face:'nervous'}],
+  ],()=>choose([
+    ['쪽지를 펼쳐본다',()=>say([
+      ['n','쪽지에는 수학 선생님 얼굴을 한 감자가 그려져 있었다. 말풍선: "x는 감자입니다"'],
+      ['t','푸흡…! 안 돼, 웃지 마, 웃지 마 샬럿…!!',{face:'pain',p:6}]],
+      ()=>mini('웃음 참기!','웃음이 터지면 다른 것도 같이 터진다',3,(n)=>{
+        S.jiu=1;
+        if(n>=2)say([
+          ['t','…후우. 참았다. 지우, 너 나중에 두고 봐.',{face:'nervous'}],
+          ['지우','(소곤) 와, 너 표정 관리 대박이다.']],scene4);
+        else say([
+          ['c','푸하핫—',{face:'relief'}],
+          ['n','뽀오옹.',{sfx:'small',fx:'뽀옹',shake:true,p:-14,s:24,face:'pain'}],
+          ['n','웃음소리와 정체불명의 소리가 동시에 울려 퍼졌다.'],
+          ['수학 선생님','샬럿, 지우. 뭐가 그렇게 재밌니?'],
+          ['지우','(소곤) …방금 그거 무슨 소리야?'],
+          ['c','(소곤) 우, 운동화! 운동화 삑삑이야!']],()=>{S.leaks++;scene4();});
+      }))],
+    ['단호하게 쪽지를 돌려준다',()=>say([
+      ['c','(소곤) 미안, 지금은 진짜 안 돼.',{face:'nervous'}],
+      ['지우','(소곤) 뭐야, 너 오늘 좀 이상해. 아까부터 땀도 나고.',{s:8}],
+      ['t','예리해…! 지우의 관찰력이 오늘따라 무섭다.']],scene4)],
+    ['지우에게 솔직히 털어놓는다',()=>say([
+      ['c','(소곤) 지우야… 사실 나 지금 방귀 참는 중이야. 엄청 큰 거.',{face:'pain'}],
+      ['지우','(소곤) …풉. 아 미안. 진짜야?'],
+      ['지우','(소곤) 알았어. 위험하면 신호 줘. 내가 필통 떨어뜨려 줄게.'],
+      ['t','지우… 넌 진짜 친구야…!',{face:'relief',s:-5,p:-4}]],()=>{S.jiu=2;scene4();})],
+  ]));
+}
+function scene4(){
+  say([
+    ['n','30분 경과. 선생님이 분필을 내려놓았다.',{time:'5교시 13:40',p:14}],
+    ['수학 선생님','자, 지금부터 10분간 쪽지시험이다. 숨소리도 내지 마라.'],
+    ['n','교실이 완벽한 정적에 잠겼다. 시계 초침 소리까지 들린다.'],
+    ['n','꾸르르르르르륵—',{sfx:'gurgle',fx:'꾸르르륵!',shake:true,p:8,face:'pain'}],
+    ['t','한계야… 조금이라도 빼지 않으면 종 치기 전에 대폭발이야…!'],
+  ],()=>{
+    const opts=[
+      ['기침 소리에 맞춰 조금만 내보낸다',()=>mini('기침 타이밍!','기침과 정확히 겹쳐야 들키지 않는다',2,(n)=>{
+        if(n===2)say([
+          ['c','콜록! 콜록콜록!',{sfx:'cough',p:-30,s:4,face:'relief'}],
+          ['t','완벽한 싱크로…! 아무도 눈치 못 챘어!'],
+          ['수학 선생님','샬럿, 감기니? 물 좀 마시렴.']],scene5);
+        else if(n===1)say([
+          ['c','콜록!',{sfx:'cough'}],
+          ['n','…뿡.',{sfx:'small',fx:'…뿡',p:-22,s:22,face:'pain'}],
+          ['t','반 박자 늦었어!!'],
+          ['n','뒷자리 민수가 코를 킁킁거리기 시작했다.']],()=>{S.leaks++;scene5();});
+        else say([
+          ['n','뿌우우웅—',{sfx:'small',fx:'뿌우웅',shake:true,p:-28,s:42,face:'pain'}],
+          ['c','…콜록.',{sfx:'cough'}],
+          ['t','순서가 반대잖아 바보야!!!'],
+          ['n','정적 속에서 스무 명의 시선이 느껴진다.']],()=>{S.leaks++;scene5();});
+      })],
+      ['필통을 떨어뜨려 소리를 덮는다',()=>mini('필통 낙하!','필통이 바닥에 닿는 순간을 노려라',2,(n)=>{
+        if(n>=1)say([
+          ['n','와장창! 필통 속 볼펜 스무 자루가 바닥에 쏟아졌다.',{shake:true,p:-24,s:10,face:'relief'}],
+          ['t','소리는 묻혔다…! 그런데 시선은 다 모였네…'],
+          ['수학 선생님','샬럿… 시험 중에 뭐 하는 거니.'],
+          ['c','죄송합니다아…',{face:'nervous'}]],scene5);
+        else say([
+          ['n','톡. 필통이 샬럿의 무릎 위에 조용히 떨어졌다.'],
+          ['n','뿌욱.',{sfx:'small',fx:'뿌욱',p:-20,s:34,face:'pain',shake:true}],
+          ['t','필통아… 왜 바닥까지 안 가는 거야…']],()=>{S.leaks++;scene5();});
+      })],
+      ['순수한 근성으로 버틴다',()=>mini('근성!!','오직 정신력. 세 번 모두 버텨내라',3,(n)=>{
+        if(n===3)say([
+          ['t','나는 바위다. 나는 댐이다. 나는 무너지지 않아…!',{p:6}],
+          ['n','샬럿은 식은땀을 흘리며 시험지에 이름만 겨우 적었다.']],scene5);
+        else say([
+          ['t','으으으읏… 조금씩… 새고 있어…!',{p:12,s:8}],
+          ['n','피식— 아주 가늘고 긴 소리가 났다.',{sfx:'pip',fx:'피식—',s:6*(3-n)}],
+          ['t','소리는 작았는데… 냄새는…?!']],()=>{S.leaks++;scene5();});
+      })],
+    ];
+    if(S.jiu===2)opts.unshift(['지우에게 신호를 보낸다 (윙크)',()=>say([
+      ['n','샬럿이 필사적으로 윙크를 보내자, 지우가 고개를 끄덕였다.',{face:'relief'}],
+      ['n','와르르르! 지우의 필통과 교과서와 물통이 한꺼번에 바닥으로 떨어졌다.',{shake:true,p:-34}],
+      ['지우','죄송합니다! 손이 미끄러졌어요!'],
+      ['t','지우…! 평생 떡볶이 사줄게…!!',{s:-4}]],scene5)]);
+    choose(opts);
+  });
+}
+function scene5(){
+  say([
+    ['n','40분 경과. 종 치기까지 앞으로 5분.',{time:'5교시 13:50',p:16}],
+    ['n','꾸구구구궁…',{sfx:'gurgle',fx:'꾸구궁…',shake:true,face:'pain'}],
+    ['t','마지막 5분… 이제 진짜 최후의 결단을 내려야 해!'],
+  ],()=>choose([
+    ['손을 번쩍 든다 "화장실 다녀와도 될까요!"',()=>say([
+      ['c','선생님! 화장실 다녀와도 될까요!',{s:6}],
+      ['수학 선생님','5분만 참으면 쉬는 시간인데… 그래, 급해 보이니 다녀오렴.'],
+      ['t','문까지 열두 걸음… 복도를 지나 화장실까지…!']],
+      ()=>mini('복도 질주!','뛰면 위험, 걸으면 늦는다. 정확한 리듬으로!',4,(n)=>{
+        if(n>=3)ending('toilet');
+        else if(n>=1){add(0,20);ending('hall');}
+        else {S.p=100;ending('boom',true);}
+      }))],
+    ['종이 울리는 순간에 맞춰 방출한다',()=>say([
+      ['t','학교 종소리는 엄청 커. 딱 그 순간이라면… 완전 범죄가 가능해!'],
+      ['n','초침이 12를 향해 간다. 5… 4… 3… 2…']],
+      ()=>mini('종소리 싱크로!','딩동댕동과 완벽하게 겹쳐라! 기회는 단 한 번',1,(n)=>{
+        if(n===1)ending('bell');else {S.p=100;ending('boom');}
+      }))],
+    ['끝까지 참는다. 한 방울도 안 샌다',()=>mini('최후의 5분!!','다섯 번의 파도를 모두 넘겨라',5,(n)=>{
+      if(n>=4)ending(S.leaks===0?'perfect':'endure');
+      else if(n>=2){add(0,25);ending('endure');}
+      else {S.p=100;ending('boom');}
+    })],
+  ]));
+}
+function checkFail(){ if(S.p>=100)ending('boom'); else if(S.s>=100)ending('caught'); }
+
+const END={
+  perfect:{rank:'👑',title:'전설의 철벽 괄약근',face:'relief',lines:[
+    ['n','딩동댕동— 종이 울렸다.',{sfx:'bell',time:'쉬는 시간'}],
+    ['n','샬럿은 우아하게 일어나, 우아하게 복도를 걸어, 우아하게 화장실 문을 닫았다.'],
+    ['n','…그리고 그날, 학교 3층 화장실에서는 원인 불명의 굉음이 관측되었다.',{sfx:'big',shake:true,fx:'💨💨💨'}],
+    ['c','후아아~ 살았다! 한 번도 안 새고 해냈어!',{face:'relief',hop:true}]],
+    desc:'단 한 번도 새지 않고 45분을 버텨냈다. 당신이 바로 인내의 화신.'},
+  toilet:{rank:'🚽',title:'화장실 골인!',face:'relief',lines:[
+    ['n','샬럿은 경보 선수 같은 걸음으로 복도를 통과해 화장실에 도착했다.'],
+    ['n','문을 잠그는 순간—',{sfx:'big',shake:true,fx:'뿌아앙!'}],
+    ['c','하아… 천국이 여기 있었구나…',{face:'relief'}],
+    ['n','교실로 돌아온 샬럿의 얼굴은 세상에서 제일 평온했다고 한다.']],
+    desc:'도움을 청할 줄 아는 것도 용기! 깔끔한 해결.'},
+  bell:{rank:'🔔',title:'완전 범죄',face:'relief',lines:[
+    ['n','딩— 동— 댕— 동—',{sfx:'bell',time:'쉬는 시간'}],
+    ['n','그 웅장한 종소리 속에, 또 하나의 웅장한 소리가 완벽하게 녹아들었다.',{sfx:'big',fx:'🔔+💨'}],
+    ['지우','오늘 종소리 좀 이상하지 않았어? 베이스가 깔린 느낌?'],
+    ['c','글쎄~? 난 잘 모르겠는데~?',{face:'relief',hop:true}],
+    ['t','완벽했어. 이건 무덤까지 가져간다.']],
+    desc:'타이밍의 천재. 아무도 진실을 모른다.'},
+  endure:{rank:'😮‍💨',title:'상처뿐인 승리',face:'nervous',lines:[
+    ['n','딩동댕동— 드디어 종이 울렸다.',{sfx:'bell',time:'쉬는 시간'}],
+    ['n','샬럿은 종이 끝나기도 전에 교실을 뛰쳐나갔다.'],
+    ['n','멀리 화장실 쪽에서 희미한 굉음이 들려왔다.',{sfx:'big',fx:'…뿌앙'}],
+    ['지우','아까 수업 시간에 났던 소리들… 설마 다 너였어?'],
+    ['c','…떡볶이 사줄 테니까 비밀로 해줘.',{face:'nervous'}]],
+    desc:'조금 새긴 했지만 대참사는 막았다. 지우의 입막음 비용: 떡볶이 1인분.'},
+  hall:{rank:'🏃',title:'복도의 메아리',face:'pain',lines:[
+    ['n','화장실까지 앞으로 다섯 걸음. 그러나 복도 한가운데서—',{face:'pain'}],
+    ['n','뿌우웅— 우웅— 웅—',{sfx:'big',shake:true,fx:'뿌우웅~'}],
+    ['n','텅 빈 복도는 소리가 아주 잘 울렸다. 옆 반 창문이 드르륵 열렸다.'],
+    ['옆 반 학생','…방금 뭐야? 트럼펫?'],
+    ['c','과, 관악부 연습이에요!!',{face:'nervous'}]],
+    desc:'교실은 지켰지만 복도는 지키지 못했다. 옆 반에 "복도의 트럼펫" 괴담이 생겼다.'},
+  caught:{rank:'🙈',title:'의심은 확신으로',face:'pain',lines:[
+    ['n','반 아이들의 시선이 하나둘 샬럿에게 모였다.',{face:'pain'}],
+    ['민수','선생님, 아까부터 나는 소리… 샬럿 쪽인 것 같은데요.'],
+    ['c','아, 아니야! 나 아니야! …맞아. 나야…',{face:'nervous'}],
+    ['수학 선생님','허허, 생리현상인데 뭘 그러니. 샬럿, 얼른 화장실 다녀오렴.'],
+    ['지우','괜찮아 샬럿! 나도 저번에 체육 시간에 뀌었어!'],
+    ['n','교실에 웃음이 번졌다. 놀리는 웃음이 아니라, 다들 한 번쯤 겪어본 웃음이었다.'],
+    ['c','…헤헤. 다녀오겠습니다!',{face:'relief',hop:true}]],
+    desc:'들키고 말았지만, 생각보다 별일 아니었다. 다음부터는 그냥 손 들고 말하자.'},
+  boom:{rank:'💥',title:'5교시 대폭발',face:'pain',lines:[
+    ['t','아… 안 돼… 더는… 무리…!!',{face:'pain',sfx:'gurgle'}],
+    ['n','뿌우우우우우우우우웅———!!!',{sfx:'big',shake:true,fx:'뿌우우웅!!!'}],
+    ['n','정적. 분필이 선생님 손에서 툭 떨어졌다.',{shake:true}],
+    ['n','창가의 커튼이 흔들렸다. 바람은 불지 않았는데.'],
+    ['수학 선생님','…창문 좀 열자.'],
+    ['지우','샬럿… 너 맛탕 세 번 먹을 때 내가 말렸잖아.'],
+    ['c','으아아아— 오늘 일은 다들 잊어줘어어!!',{face:'nervous'}],
+    ['n','그날 이후 샬럿의 별명은 한동안 "맛탕 대포"였다고 한다.',{face:'relief'}]],
+    desc:'참지 못했다… 하지만 속은 누구보다 시원하다.'},
+};
+function ending(key){
+  if(S.over)return;S.over=true;locked=false;$('choices').style.display='none';
+  const e=END[key];
+  say(e.lines,()=>{
+    if(key!=='boom'&&key!=='caught'&&key!=='hall')SFX.fanfare();
+    S.p=key==='boom'?0:S.p;face(e.face==='pain'?'relief':e.face);
+    const seen=JSON.parse(localStorageGet()||'[]');if(!seen.includes(key)){seen.push(key);localStorageSet(JSON.stringify(seen));}
+    const sc=$('screen');sc.style.display='flex';
+    sc.innerHTML=`<div class="rank">${e.rank}</div><h1><small>ENDING</small>${e.title}</h1><p>${e.desc}</p>
+      <p style="opacity:.75">수집한 엔딩 ${seen.length} / ${Object.keys(END).length}</p>
+      <button class="btn" id="again">다시 도전하기</button>`;
+    $('again').onclick=()=>{audio();SFX.click();start();};
+  });
+}
+function localStorageGet(){try{return localStorage.getItem('charlotte_endings')}catch(e){return null}}
+function localStorageSet(v){try{localStorage.setItem('charlotte_endings',v)}catch(e){}}
+
+/* ---------- 타이틀 ---------- */
+function title(){
+  S=null;$('pb').style.width=0;$('sb').style.width=0;
+  const seen=JSON.parse(localStorageGet()||'[]');
+  $('screen').style.display='flex';
+  $('screen').innerHTML=`<h1><small>비주얼 노벨</small>샬럿의<br>위기일발 5교시</h1>
+    <p>점심에 고구마 맛탕을 세 번이나 먹은 샬럿.<br>세상에서 제일 조용한 수학 시간 45분을 무사히 버텨내자!</p>
+    <button class="btn" id="go">시작하기</button>
+    <p style="opacity:.75">💨 압력이 100이 되면 대폭발 · 👀 의심이 100이 되면 들통<br>수집한 엔딩 ${seen.length} / ${Object.keys(END).length}</p>`;
+  $('go').onclick=()=>{audio();SFX.click();start();};
+}
+$('mute').onclick=e=>{e.stopPropagation();muted=!muted;$('mute').textContent=muted?'🔇':'🔊';};
+title();
+</script>
+</body>
+</html>
