@@ -540,7 +540,7 @@
 
     // ---------- 변수 / 조건 ----------
     function applySet(obj) {
-      setTimeout(updateHud, 0); // 값이 바뀌면 게이지도 움직여요
+      setTimeout(() => { updateHud(); refreshPics(); }, 0); // 값이 바뀌면 게이지 · 변수 그림도 따라가요
       for (const [k, v] of Object.entries(obj)) {
         if (typeof v === "number") S.vars[k] = (+S.vars[k] || 0) + v;
         else if (typeof v === "string" && v[0] === "=") { const r = v.slice(1); S.vars[k] = r === "true" ? true : r === "false" ? false : isNaN(+r) || r === "" ? r : +r; }
@@ -1215,12 +1215,30 @@
 
     // ---------- 변수 그림: 변수 값에 따라 다른 그림 ----------
     // 🧩 화면 위 그림: 자리(slot)마다 한 장. 위치 x·y(화면 %, 그림 가운데 기준) · 너비 w(화면 너비 %) · 층 · 나타나기
-    function setPic(slot, name, o) {
+    // rule 이 있으면 변수가 바뀔 때마다 다시 골라요 (live). name 이 null 이면 "지금은 맞는 그림 없음".
+    function setPic(slot, name, o, rule) {
       S.pics = S.pics || {};
       slot = slot || "그림";
-      if (!name) delete S.pics[slot];
-      else S.pics[slot] = { image: name, x: o.x == null ? 50 : +o.x, y: o.y == null ? 50 : +o.y, w: o.w == null ? 25 : +o.w, layer: o.layer || "front", anim: o.anim || "fade" };
+      const base = { x: o.x == null ? 50 : +o.x, y: o.y == null ? 50 : +o.y, w: o.w == null ? 25 : +o.w, layer: o.layer || "front", anim: o.anim || "fade" };
+      if (rule) S.pics[slot] = Object.assign(base, { image: name || "", rule });
+      else if (!name) delete S.pics[slot];
+      else S.pics[slot] = Object.assign(base, { image: name });
       renderPics(false, slot);
+    }
+    function pickRule(rule) {
+      const hit = (rule.cases || []).find((x) => evalCond(x.if));
+      return hit ? hit.image : rule.else;
+    }
+    // 변수가 바뀌면: 따라가는(live) 화면 위 그림을 다시 골라요
+    function refreshPics() {
+      if (!S || !S.pics) return;
+      for (const [slot, p] of Object.entries(S.pics)) {
+        if (!p.rule) continue;
+        const im = pickRule(p.rule);
+        if (im === undefined || im === null || im === p.image) continue; // 맞는 조건이 없고 '그대로 두기'면 지금 그림 유지
+        p.image = im;
+        renderPics(false, slot);
+      }
     }
     function renderPics(instant, changed) {
       const want = S.pics || {};
@@ -1229,7 +1247,13 @@
         if (!p || im.parentNode.dataset.layer !== (p.layer || "front")) { im.classList.add("out"); later(() => im.remove(), instant ? 0 : 400); im.dataset.slot = "__gone"; }
       });
       for (const [slot, p] of Object.entries(want)) {
-        const src = img(PICS[p.image] || CGS[p.image] || ITEMS[p.image] || p.image);
+        if (!p.image) { [...R.querySelectorAll(".vn-pic")].filter((x) => x.dataset.slot === slot).forEach((x) => { x.classList.add("out"); x.dataset.slot = "__gone"; later(() => x.remove(), 400); }); continue; }
+        const src = img(PICS[p.image] || CGS[p.image] || ITEMS[p.image] || "");
+        if (!src) {
+          console.warn("없는 변수 그림:", p.image);
+          if (opts.onExit) toast(`⚠ 변수 그림 「${p.image}」 을(를) 찾을 수 없어요`); // 창작기 테스트에서만 알려줘요
+          continue;
+        }
         let im = [...R.querySelectorAll(".vn-pic")].find((x) => x.dataset.slot === slot);
         const fresh = !im;
         if (fresh) {
@@ -1247,11 +1271,16 @@
     function applyVarImage(c) {
       const hit = (c.cases || []).find((x) => evalCond(x.if));
       const im = hit ? hit.image : c.else;
+      if (c.varImage === "pic" && c.live !== false) {
+        // 지금 맞는 그림이 없어도 규칙은 기억해 둬요 → 나중에 변수가 바뀌면 나타나요
+        const prev = (S.pics || {})[c.slot || "그림"];
+        return setPic(c.slot, im === undefined || im === null ? (prev && prev.image) || "" : im, c, { cases: c.cases || [], else: c.else });
+      }
       if (im === undefined || im === null) return; // 맞는 조건이 없고 else 도 없으면 그대로
       const t = c.varImage;
       if (t === "bg") { if (im) setBg(im); }
       else if (t === "cg") setCg(im, c.fit);
-      else if (t === "pic") setPic(c.slot, im, c);
+      else if (t === "pic") setPic(c.slot, im, c, c.live === false ? null : { cases: c.cases || [], else: c.else });
       else if (CHARS[t]) {
         const prev = S.chars[t] || {};
         S.chars[t] = Object.assign({}, prev, { face: im || prev.face || "normal", pos: c.pos || prev.pos || "center" });
@@ -1369,7 +1398,7 @@
         mgClear();
         M.hidden = true; M.innerHTML = "";
         S.log.push({ name: "🎮", text: `${cmd.title || "미니게임"} — ${picked}개 골랐어요` });
-        if (cmd.score) { S.vars[cmd.score] = picked; updateHud(); }
+        if (cmd.score) { S.vars[cmd.score] = picked; updateHud(); refreshPics(); }
         const t = target || cmd.goto;
         if (t) jump(t); else run();
       }

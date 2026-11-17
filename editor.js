@@ -234,9 +234,11 @@
     const hit = real.find((c) => startCond(`${c.var} ${c.op} ${c.val}`));
     const im = hit ? hit.image : f.else !== "__keep" ? f.else : null;
     if (!real.length && f.else === "__keep") return h("p", { class: "warn" }, "⚠ 보여줄 그림이 정해지지 않았어요. 위에서 그림을 골라 주세요.");
+    if (im === null && f.target === "pic" && f.live !== false) return h("p", { class: "hint" }, "게임 시작 때는 아직 조건에 맞지 않아 안 보이다가, 변수가 바뀌어 조건에 맞게 되면 그때 나타나요.");
     if (im === null) return h("p", { class: "warn" }, "⚠ 게임 시작 때의 변수 값으로는 어느 조건에도 안 맞아서, 이 블록에서 그림이 안 보여요. '어느 조건에도 안 맞으면'에 그림을 골라 두면 항상 무언가 보여요.");
-    if (!im) return h("p", { class: "hint" }, "게임 시작 때의 변수 값이면 이 자리의 그림을 숨겨요.");
-    return h("p", { class: "hint" }, `✅ 게임 시작 때의 변수 값이면 「${im}」 이(가) 보여요. 변수가 바뀌면 그에 맞는 그림으로 바뀌어요.`);
+    const follow = f.target === "pic" && f.live !== false;
+    if (!im) return h("p", { class: "hint" }, "게임 시작 때의 변수 값이면 이 자리의 그림을 숨겨요." + (follow ? " 변수가 바뀌면 그에 맞는 그림이 나타나요." : ""));
+    return h("p", { class: "hint" }, `✅ 게임 시작 때의 변수 값이면 「${im}」 이(가) 보여요.` + (follow ? " 변수가 바뀌면 바로 그에 맞는 그림으로 바뀌어요." : " (이 블록을 지날 때 한 번 정해요)"));
   }
   function imageChoices(target) {
     if (target === "pic") return Object.assign({ "": "숨기기 (이 자리 비우기)" }, Object.fromEntries(Object.keys(proj.pics).map((n) => [n, "🧩 " + n])));
@@ -302,7 +304,7 @@
         target: b.varImage, fit: b.fit || "contain",
         cases: (b.cases || []).map((x) => Object.assign(parseCond(x.if), { image: x.image == null ? "" : x.image })),
         else: b.else === undefined ? "__keep" : b.else,
-        slot: b.slot || "그림", x: b.x == null ? 50 : b.x, y: b.y == null ? 50 : b.y, w: b.w == null ? 25 : b.w, layer: b.layer || "front", anim: b.anim || "fade" };
+        slot: b.slot || "그림", x: b.x == null ? 50 : b.x, y: b.y == null ? 50 : b.y, w: b.w == null ? 25 : b.w, layer: b.layer || "front", anim: b.anim || "fade", live: b.live !== false };
       case "minigame": return {
         title: b.title || "", hint: b.hint || "", image: b.image || "", picks: String(b.picks || 0), labels: !!b.labels, goto: b.goto || "", score: b.score || "",
         objects: (b.objects || []).map((o) => Object.assign({
@@ -368,7 +370,7 @@
         if (els === "__keep" && orphan) els = orphan.image; // 변수를 안 고른 줄의 그림은 '항상 보여줄 그림'으로
         if (els !== "__keep") o.else = els;
         if (f.target === "cg" && f.fit === "cover") o.fit = "cover";
-        if (f.target === "pic") Object.assign(o, { slot: f.slot || "그림", x: Math.round(f.x), y: Math.round(f.y), w: f.w, layer: f.layer, anim: f.anim });
+        if (f.target === "pic") { Object.assign(o, { slot: f.slot || "그림", x: Math.round(f.x), y: Math.round(f.y), w: f.w, layer: f.layer, anim: f.anim }); if (f.live === false) o.live = false; }
         return o;
       }
       case "minigame": {
@@ -422,8 +424,8 @@
         const first = Object.keys(imageChoices(target)).find((x) => x) || "";
         // 변수가 없으면 조건 없이 "항상 보여줄 그림"으로 시작해요 (조건 줄에 넣은 그림이 사라지지 않게)
         return vars.length
-          ? { target, fit: "contain", cases: [{ var: vars[0], op: ">=", val: "1", image: first }], else: first, slot: "그림", x: 50, y: 30, w: 25, layer: "front", anim: "pop" }
-          : { target, fit: "contain", cases: [], else: first, slot: "그림", x: 50, y: 30, w: 25, layer: "front", anim: "pop" };
+          ? { target, fit: "contain", cases: [{ var: vars[0], op: ">=", val: "1", image: first }], else: first, slot: "그림", x: 50, y: 30, w: 25, layer: "front", anim: "pop", live: true }
+          : { target, fit: "contain", cases: [], else: first, slot: "그림", x: 50, y: 30, w: 25, layer: "front", anim: "pop", live: true };
       }
       case "minigame": return {
         title: "", hint: "", image: Object.keys(proj.cgs)[0] || Object.keys(proj.backgrounds)[0] || "", picks: "1", labels: true, goto: "", score: "",
@@ -549,7 +551,7 @@
         if (k === "varimg" && !f.cases.length && f.else === "__keep") out.push(`${at}: 변수 그림 블록에 보여줄 그림이 없어요.`);
         if (k === "varimg") {
           const ok = imageChoices(f.target);
-          if (f.target !== "bg" && f.target !== "cg" && !proj.characters[f.target]) out.push(`${at}: 캐릭터 "${f.target}" 이 없어요.`);
+          if (f.target !== "bg" && f.target !== "cg" && f.target !== "pic" && !proj.characters[f.target]) out.push(`${at}: 캐릭터 "${f.target}" 이 없어요.`);
           else [...f.cases.map((c) => c.image), f.else === "__keep" ? undefined : f.else].forEach((im) => im !== undefined && !(im in ok) && out.push(`${at}: 변수 그림의 "${im || "(빈 칸)"}" 그림이 없어요.`));
         }
         if (k === "bg" && !proj.backgrounds[f.bg]) out.push(`${at}: 배경 "${f.bg}" 이 없어요.`);
@@ -1708,6 +1710,8 @@
               field("나타나기", sel("anim", { fade: "서서히", pop: "톡 튀어나오기", drop: "위에서 떨어지기", slide: "옆에서 밀려오기", none: "바로" })),
               field("자리 이름", h("input", { type: "text", value: f.slot, list: "pic-slots", placeholder: "그림", oninput: (e) => { f.slot = e.target.value.trim() || "그림"; upd(); } }))),
             h("datalist", { id: "pic-slots" }, [...slots].map((n) => h("option", { value: n }))),
+            h("label", { class: "check" }, h("input", { type: "checkbox", checked: f.live !== false, onchange: (e) => { f.live = e.target.checked; redraw(); } }),
+              "변수가 바뀌면 그림도 바로 바꾸기 (게이지처럼 따라가요)"),
             h("p", { class: "hint" }, "같은 '자리 이름'을 쓰는 블록끼리는 그림이 바뀌고, 다른 이름이면 여러 그림이 같이 떠 있어요. 그림을 치우려면 '숨기기'를 고르세요."),
             h("button", { class: "btn wide", onclick: () => {
               // 변수 값과 상관없이, 위 미리보기에 보이는 그림으로 보여줘요
