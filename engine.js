@@ -302,7 +302,8 @@
         if (st.fx === "shake") out.push({ shake: true });
         else if (st.fx === "flash") out.push({ flash: "white" });
         else if (st.fx === "flashRed") out.push({ flash: "#ff4d6d" });
-        if (st.particles) out.push({ particles: st.particles, mode: "burst", x: st.x == null ? 50 : st.x, y: st.y == null ? 45 : st.y });
+        // 입자: 펑(한 번) · 그 자리에서 계속 · 화면 가득 계속 — 계속 나오는 건 그림을 치울 때 같이 꺼져요
+        if (st.particles) out.push({ particles: st.particles, mode: st.pmode || "burst", x: st.x == null ? 50 : st.x, y: st.y == null ? 45 : st.y, cgLink: true });
         if (st.text) out.push(st.say ? { say: st.say, text: st.text } : { text: st.text });
         else out.push({ tap: true });
       });
@@ -390,6 +391,11 @@
         el.cg2.style.transition = "none"; el.cg2.style.backgroundImage = was;
         el.cg2.className = el.cg.className.replace("vn-cg2", "") + " vn-cg2"; el.cg2.style.opacity = 1;
         requestAnimationFrame(() => requestAnimationFrame(() => { el.cg2.style.transition = "opacity .6s"; el.cg2.style.opacity = 0; }));
+      }
+      // 이벤트 그림과 함께 켠 입자(계속)는 그림을 치우면 같이 꺼져요
+      if (!src && pfx.emits.some((e) => e.cmd && (e.cmd.cgLink || e.cmd.cg))) {
+        pfx.emits = pfx.emits.filter((e) => !(e.cmd && (e.cmd.cgLink || e.cmd.cg)));
+        S.pfx = pfx.emits.map((e) => e.cmd);
       }
       if (src) el.cg.style.backgroundImage = `url("${src}")`;
       el.cg.classList.toggle("cover", fit === "cover");
@@ -1640,6 +1646,8 @@
     if (opts.startScene) startGame(null, opts.startScene); else { toTitle(); if (opts.openGallery) openGallery(); }
 
     return {
+      // 지금 계속 나오고 있는 입자 효과 이름들 (확인용)
+      effects: () => pfx.emits.map((e) => e.name),
       destroy() {
         dead = true; mgClear(); stopBgm(); document.removeEventListener("visibilitychange", onVis); cancelAnimationFrame(pfx.raf); clearInterval(typing); timers.forEach(clearTimeout);
         document.removeEventListener("keydown", onKey);
