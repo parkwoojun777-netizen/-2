@@ -327,3 +327,8 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .inbox-item small { font-size: 11.5px; text-align: center; word-break: keep-all; }
 .picker-help { font-size: 12px; }
 .inbox-card { display: flex; flex-direction: column; gap: 8px; }
+
+/* 🖼 입자 미리보기 배경 */
+.pv-bar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.pv-bar .f { flex: 1; min-width: 180px; }
+.pv-bar .check { padding-bottom: 10px; }

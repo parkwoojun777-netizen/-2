@@ -874,6 +874,37 @@
   }
   const dirArrow = (d) => (d == null ? "" : "↑↗→↘↓↙←↖"[Math.round((((d % 360) + 360) % 360) / 45) % 8]);
 
+  // ===== 🖼 입자 미리보기 배경 (마지막으로 고른 것을 기억해요) =====
+  const PV_WHITE = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='16' height='9'><rect width='16' height='9' fill='#ffffff'/></svg>");
+  const pvSetting = () => Object.assign({ bg: "", char: false }, pref.get("pfxPreview", {}));
+  // 미리보기 이야기 앞부분: 고른 배경 (+ 캐릭터)
+  function pvBlocks() {
+    const s = pvSetting(), out = [];
+    if (s.bg === "__white") out.push({ bg: PV_WHITE });
+    else if (s.bg === "__black") { /* 아무것도 안 깔면 검은 화면 */ }
+    else if (s.bg.startsWith("cg:") && proj.cgs[s.bg.slice(3)]) out.push({ cg: s.bg.slice(3), fit: "cover" });
+    else if (s.bg && proj.backgrounds[s.bg]) out.push({ bg: s.bg });
+    else { const first = Object.keys(proj.backgrounds)[0]; if (first) out.push({ bg: first }); }
+    const cid = Object.keys(proj.characters)[0];
+    if (s.char && cid) out.push({ show: cid });
+    if (!out.length) out.push({ wait: 1 });
+    return out;
+  }
+  function pvPicker(onChange) {
+    const s = pvSetting();
+    const save = (k, v) => { const cur = pvSetting(); cur[k] = v; pref.set("pfxPreview", cur); onChange(); };
+    const opt = (v, t) => h("option", { value: v, selected: s.bg === v }, t);
+    const bgs = Object.keys(proj.backgrounds), cgs = Object.keys(proj.cgs);
+    return h("div", { class: "pv-bar" },
+      h("label", { class: "f" }, "미리보기 배경",
+        h("select", { onchange: (e) => save("bg", e.target.value) },
+          opt("", "첫 번째 배경 (기본)"),
+          bgs.length ? h("optgroup", { label: "배경" }, bgs.map((n) => opt(n, "🖼 " + n))) : null,
+          cgs.length ? h("optgroup", { label: "이벤트 그림" }, cgs.map((n) => opt("cg:" + n, "🎞 " + n))) : null,
+          h("optgroup", { label: "단색" }, opt("__black", "⬛ 검은 화면"), opt("__white", "⬜ 흰 화면")))),
+      Object.keys(proj.characters).length ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: s.char, onchange: (e) => save("char", e.target.checked) }), "캐릭터도 같이 보기") : null);
+  }
+
   // ===== 🎨 내 효과 (커스텀 입자) =====
   const FX_SHAPES = { circle: "● 동그라미", glow: "◉ 빛 방울 (흐릿)", star: "★ 별", sparkle: "✦ 반짝이", heart: "♥ 하트", square: "■ 네모 조각", petal: "🌸 꽃잎", ring: "◯ 고리", line: "／ 줄 (빗줄기·유성)", emoji: "😀 이모지 · 글자", image: "🖼 오브젝트 그림" };
   const FX_DEFAULT = { shape: "star", colors: ["#fff3a8", "#ffd23f"], sizeMin: 4, sizeMax: 9, dir: 0, spread: 50, speedMin: 60, speedMax: 160, gravity: 40, drag: 0.4,
@@ -902,10 +933,9 @@
     const preview = () => {
       if (inst) inst.destroy();
       if (!stage.isConnected) return;
-      const bgName = Object.keys(proj.backgrounds)[0];
       const fxName = "__preview__";
-      const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images, items: proj.items, effects: { [fxName]: clean(d) },
-        story: { a: [bgName ? { bg: bgName } : { wait: 1 }, Object.assign({ particles: fxName, mode: st.mode }, st.mode !== "fall" ? { x: Math.round(st.x), y: Math.round(st.y) } : {}), { wait: 2000000000 }] } };
+      const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, cgs: proj.cgs, characters: proj.characters, images: proj.images, items: proj.items, effects: { [fxName]: clean(d) },
+        story: { a: [...pvBlocks(), Object.assign({ particles: fxName, mode: st.mode }, st.mode !== "fall" ? { x: Math.round(st.x), y: Math.round(st.y) } : {}), { wait: 2000000000 }] } };
       inst = VN.mount(stage, P, { startScene: "a", preview: true });
     };
     const upd = () => { clearTimeout(pvT); pvT = setTimeout(preview, 250); dot.style.background = (d.colors || [])[0] || "#fff"; dot.hidden = st.mode === "fall"; };
@@ -937,6 +967,7 @@
       put(body,
         h("div", { class: "chips" }, Object.keys(FX_PRESETS).map((k) => h("button", { class: "chip", onclick: () => { Object.assign(d, clone(FX_DEFAULT), clone(FX_PRESETS[k])); draw(); upd(); } }, k))),
         h("p", { class: "hint" }, "위 예시를 눌러 시작하고, 아래에서 하나씩 바꿔 보세요. 미리보기가 바로 바뀌어요."),
+        pvPicker(() => preview()),
         h("label", { class: "f" }, "미리보기 — 누른 곳에서 나와요", box),
         h("div", { class: "chips" }, Object.entries({ spread: "퍼져 나오기 (계속)", burst: "펑! 터지기", fall: "화면 전체" }).map(([m, t]) =>
           h("button", { class: "chip" + (st.mode === m ? " on" : ""), onclick: () => { st.mode = m; draw(); upd(); } }, t)),
@@ -1570,13 +1601,13 @@
         f._preview = () => {
           if (inst) inst.destroy();
           if (!stage.isConnected) return;
-          const bgName = Object.keys(proj.backgrounds)[0];
-          const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, images: proj.images, items: proj.items, effects: proj.effects,
-            story: { a: [bgName ? { bg: bgName } : { wait: 1 }, fromForm("particles", f), { wait: 2000000000 }] } };
+          const P = { title: "__preview", start: "a", backgrounds: proj.backgrounds, cgs: proj.cgs, characters: proj.characters, images: proj.images, items: proj.items, effects: proj.effects,
+            story: { a: [...pvBlocks(), fromForm("particles", f), { wait: 2000000000 }] } };
           inst = VN.mount(stage, P, { startScene: "a", preview: true });
         };
         parts.push(
           field("나오는 방식", sel("mode", PMODE, true)),
+          pvPicker(() => f._preview && f._preview()),
           h("label", { class: "f" }, point ? "미리보기 — 누른 곳에서 나와요" : "미리보기", box, h("div", { class: "row" }, posTxt,
             h("button", { class: "btn", style: { marginLeft: "auto", padding: "5px 10px", fontSize: "13px" }, onclick: (e) => { e.preventDefault(); f._preview && f._preview(); } }, "↻ 다시 보기"))),
           h("label", { class: "f" }, "🧭 나오는 방향", dirPicker(f, upd, true)),
