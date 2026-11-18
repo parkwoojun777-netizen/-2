@@ -1,0 +1,40 @@
+{
+  "adb_serial": null,
+  "adb_path": "adb",
+
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "price_per_mtok": { "input": 4.0, "output": 20.0 },
+
+  "goal": "킹레거시 던전을 클리어한다. 던전 안에서는 적을 찾아가서 처치하고, 다음 웨이브/방으로 이동한다. 클리어하면 보상 창을 닫고 다시 던전에 입장해서 반복한다.",
+
+  "image_max_width": 1280,
+  "draw_grid": true,
+  "history_length": 10,
+
+  "step_interval_sec": 1.0,
+  "combat_step_interval_sec": 6.0,
+  "max_minutes": 60,
+
+  "buttons": {
+    "attack":  [2150, 820],
+    "skill_z": [1900, 900],
+    "skill_x": [1950, 700],
+    "skill_c": [2100, 600],
+    "skill_v": [2280, 560],
+    "skill_f": [1800, 1000],
+    "jump":    [2250, 980]
+  },
+
+  "joystick": { "center": [300, 820], "radius": 140 },
+  "camera_drag_area": { "center": [1500, 450], "small": 150, "medium": 350, "large": 700 },
+
+  "combat_rotation": [
+    { "button": "skill_z", "cooldown": 6 },
+    { "button": "skill_x", "cooldown": 8 },
+    { "button": "skill_c", "cooldown": 10 },
+    { "button": "skill_v", "cooldown": 15 }
+  ],
+  "attack_taps_between_skills": 4,
+  "tap_gap_sec": 0.15
+}
