@@ -145,6 +145,7 @@
     narr:   { label: "나레이션",    desc: "이름 없는 설명 글" },
     bg:     { label: "배경",        desc: "배경 그림을 바꿔요" },
     cg:     { label: "이벤트 그림", desc: "그림을 화면 가득 보여줘요" },
+    cghide: { label: "이벤트 그림 그만 보여주기", desc: "보여주던 그림을 치워요" },
     cgseq:  { label: "CG 넘기기",   desc: "탭할 때마다 그림·대사·소리·효과" },
     sound:  { label: "효과음",      desc: "소리 한 번 재생" },
     bgm:    { label: "배경음악",    desc: "음악 틀기 · 바꾸기 · 끄기" },
@@ -166,6 +167,7 @@
     end:    { label: "엔딩",        desc: "게임을 끝내요" },
   };
   const SAY_RE = VN.SAY_RE;
+  const CG_HIDE_SPEED = { "": "보통 (0.5초)", slow: "천천히 사라지기", fast: "빠르게", now: "바로 (뚝)" };
   const FX = { shake: "화면 흔들기", "flash:white": "하얗게 번쩍", "flash:#ff4d6d": "빨갛게 번쩍", "fade:black": "검은 화면 전환", "fade:white": "하얀 화면 전환" };
   const POS = { left: "왼쪽", center: "가운데", right: "오른쪽" };
 
@@ -179,6 +181,7 @@
     if (b.signal !== undefined) return "signal";
     if (b.act !== undefined && b.say === undefined) return "act";
     if (b.minigame) return b.minigame === "pick" ? "minigame" : "raw"; // 예전 미니게임은 코드 블록으로 보여줘요
+    if (b.cg === "" && Object.keys(b).every((k) => ["cg", "speed", "keepFx"].includes(k))) return "cghide";
     if (b.cg !== undefined && typeof b.cg === "string") return "cg"; // 이벤트 그림 (효과 · 입자를 같이 가질 수 있어요)
     if (b.particles !== undefined) return "particles";
     if (b.tint !== undefined) return "tint";
@@ -291,7 +294,8 @@
       }
       case "narr": return { text: typeof b === "string" ? b : b.text };
       case "bg": return { bg: b.bg };
-      case "cg": return { cg: b.cg || "", fit: b.fit || "contain",
+      case "cghide": return { speed: b.speed || "", keepFx: !!b.keepFx };
+      case "cg": return { cg: b.cg || "", fit: b.fit || "contain", hideAfter: b.hideAfter === "tap" ? "tap" : b.hideAfter ? "sec" : "", sec: b.hideAfter && b.hideAfter !== "tap" ? b.hideAfter / 1000 : 2, hideSpeed: b.hideSpeed || "",
         fx: b.shake ? "shake" : b.flash === "white" ? "flash" : b.flash ? "flashRed" : "",
         shape: b.particles || "", mode: b.mode || "fall", x: b.x == null ? 50 : b.x, y: b.y == null ? 45 : b.y, amount: String(b.amount || 2),
         dir: b.dir == null ? null : b.dir, spread: b.spread == null ? null : b.spread, color: (b.color || PCOLOR[b.particles] || "#ffffff").toLowerCase() };
@@ -347,10 +351,13 @@
       }
       case "narr": return SAY_RE.test(f.text) ? { text: f.text } : f.text;
       case "bg": return { bg: f.bg };
+      case "cghide": { const o = { cg: "" }; if (f.speed) o.speed = f.speed; if (f.keepFx) o.keepFx = true; return o; }
       case "cg": {
         if (!f.cg) return { cg: "" };
         const o = { cg: f.cg };
         if (f.fit === "cover") o.fit = "cover";
+        if (f.hideAfter === "tap") o.hideAfter = "tap"; else if (f.hideAfter === "sec") o.hideAfter = Math.max(100, Math.round((+f.sec || 1) * 1000));
+        if (f.hideAfter && f.hideSpeed) o.hideSpeed = f.hideSpeed;
         if (f.fx === "shake") o.shake = true; else if (f.fx === "flash") o.flash = "white"; else if (f.fx === "flashRed") o.flash = "#ff4d6d";
         if (f.shape) {
           o.particles = f.shape;
@@ -441,7 +448,8 @@
       case "say": return { name: firstChar ? proj.characters[firstChar].name : "나", text: "", face: "" };
       case "narr": return { text: "" };
       case "bg": return { bg: Object.keys(proj.backgrounds)[0] || "" };
-      case "cg": return { cg: Object.keys(proj.cgs)[0] || "", fit: "contain", fx: "", shape: "", mode: "fall", x: 50, y: 45, amount: "2", dir: null, spread: null, color: "" };
+      case "cg": return { cg: Object.keys(proj.cgs)[0] || "", fit: "contain", fx: "", shape: "", mode: "fall", x: 50, y: 45, amount: "2", dir: null, spread: null, color: "", hideAfter: "", sec: 2, hideSpeed: "" };
+      case "cghide": return { speed: "", keepFx: false };
       case "show": return { id: firstChar || "", face: firstChar ? Object.keys(proj.characters[firstChar].faces || {})[0] || "" : "", pos: "center" };
       case "hide": return { id: firstChar || "all" };
       case "set": return { var: vars[0] || "", op: "+", val: "1" };
@@ -482,7 +490,8 @@
       case "say": return [h("b", { style: { color: nameColor(f.name) } }, f.name), f.face ? `(${f.face}) ` : "", f.act ? `[${(MOTION_NAME[f.act] || f.act).replace(/^\S+\s/, "")}] ` : "", f.text];
       case "narr": return f.text;
       case "bg": return ["🖼 ", f.bg, proj.backgrounds[f.bg] ? "" : " ⚠ 없는 배경"];
-      case "cg": return f.cg ? ["🎞 ", f.cg, f.fit === "cover" ? " · 꽉 채우기" : "", f.fx ? " · " + SEQ_FX[f.fx] : "", f.shape ? ` · ${PSHAPE[f.shape] || "🎨 " + f.shape}` : "", proj.cgs[f.cg] ? "" : " ⚠ 없는 그림"] : "이벤트 그림 숨기기";
+      case "cg": return f.cg ? ["🎞 ", f.cg, f.fit === "cover" ? " · 꽉 채우기" : "", f.fx ? " · " + SEQ_FX[f.fx] : "", f.shape ? ` · ${PSHAPE[f.shape] || "🎨 " + f.shape}` : "", f.hideAfter === "tap" ? " · 탭하면 그만" : f.hideAfter === "sec" ? ` · ${+f.sec}초 뒤 그만` : "", proj.cgs[f.cg] ? "" : " ⚠ 없는 그림"] : "이벤트 그림 숨기기";
+      case "cghide": return ["🎞 이벤트 그림 그만 보여주기", f.speed ? " · " + CG_HIDE_SPEED[f.speed] : "", f.keepFx ? " · 입자는 계속" : ""];
       case "show": return `${charName(f.id)} · ${f.face || "표정 그대로"} · ${POS[f.pos] || f.pos}`;
       case "hide": return `${charName(f.id)} 퇴장`;
       case "set": return setText(b.set);
@@ -1628,6 +1637,12 @@
         if (!Object.keys(opts).length) return [h("p", { class: "hint" }, "배경이 아직 없어요. 바로 올려 보세요."), up];
         return [field("배경", sel("bg", opts, true)), h("div", { class: "bg-preview", style: { backgroundImage: `url("${imgSrc(proj.backgrounds[f.bg])}")` } }), up];
       }
+      case "cghide": return [
+        h("p", { class: "hint" }, "보여주고 있던 이벤트 그림을 치우고, 다시 배경과 캐릭터가 보이게 해요."),
+        field("사라지는 빠르기", sel("speed", CG_HIDE_SPEED)),
+        h("label", { class: "check" }, h("input", { type: "checkbox", checked: f.keepFx, onchange: (e) => { f.keepFx = e.target.checked; upd(); } }), "그림과 함께 켠 입자 효과는 계속 나오게 하기"),
+        h("p", { class: "hint" }, "체크하지 않으면 그림과 함께 켠 입자도 같이 꺼져요. 따로 켠 입자 효과(예: 비)는 그대로예요."),
+        h("button", { class: "btn wide", onclick: () => { const c = Object.keys(proj.cgs)[0]; previewBlock({ group: "미리보기", blocks: [c ? { cg: c, particles: "petal" } : { wait: 1 }, { tap: true }, fromForm("cghide", f)] }); } }, "▶ 미리보기 (탭하면 사라져요)")];
       case "cg": {
         const opts = { "": "— 숨기기 —" }; Object.keys(proj.cgs).forEach((n) => (opts[n] = n));
         const up = imageInput({ kind: "cg", label: "🎞 새 이벤트 그림 올리기" }, (ref, file) => {
@@ -1651,7 +1666,13 @@
               Object.entries(particleOpts()).map(([v, t]) => h("option", { value: v, selected: v === f.shape }, t))))),
             h("label", { class: "f" }, point ? "미리보기 — 누른 곳에서 입자가 나와요" : "미리보기", pv.box, pv.row),
             f.shape ? pfxControls(f, { shape: "shape", mode: "mode" }, PMODE, upd, redraw) : null,
-            f.shape && f.mode !== "burst" ? h("p", { class: "hint" }, "계속 나오는 입자는 [숨기기]로 이 그림을 치우면 같이 꺼져요.") : null)];
+            f.shape && f.mode !== "burst" ? h("p", { class: "hint" }, "계속 나오는 입자는 이 그림을 그만 보여줄 때 같이 꺼져요.") : null),
+          h("div", { class: "opt-card" },
+            h("b", {}, "👋 그만 보여주기"),
+            field("그림을 언제까지 보여줄까요?", sel("hideAfter", { "": "계속 보여주기 (나중에 [이벤트 그림 그만 보여주기] 블록으로 치우기)", tap: "탭하면 그만 보여주기", sec: "몇 초 뒤 그만 보여주기" }, true)),
+            f.hideAfter === "sec" ? field("몇 초 뒤?", h("input", { type: "number", min: "0.1", step: "0.5", value: f.sec, oninput: (e) => { f.sec = e.target.value; upd(); } })) : null,
+            f.hideAfter ? field("사라지는 빠르기", sel("hideSpeed", CG_HIDE_SPEED)) : null,
+            f.hideAfter ? h("button", { class: "btn wide", onclick: () => previewBlock(fromForm("cg", f)) }, "▶ 처음부터 끝까지 미리보기") : null)];
       }
       case "show": {
         if (!Object.keys(chars).length) return [h("p", { class: "hint" }, "캐릭터가 아직 없어요. [그림] 탭에서 캐릭터를 만들어 주세요.")];
@@ -2609,7 +2630,7 @@
       L("5. 조건 — 만약 ~라면", "if 에 비교식을 쓰면 맞을 때 goto 장면으로, 아니면 else 장면으로 가요. >= 이상, <= 이하, == 같음, != 다름.",
         '{ if: "호감도 >= 3", goto: "고백", else: "친구엔딩" }'),
       L("6. 이벤트 그림 — 그림 한 장 크게", "cgs 에 그림을 등록해 두고 { cg: \"이름\" } 으로 보여주고, { cg: \"\" } 로 숨겨요. 빈 문자열 \"\" 은 '아무것도 없음'이라는 뜻이에요.",
-        'cgs: { 옥상_노을: "img:..." },\n\n{ cg: "옥상_노을" }   // 보여주기\n{ cg: "옥상_노을", flash: "white", particles: "sparkle" }  // 번쩍 + 반짝이와 함께\n"샬럿: 예쁘다…"\n{ cg: "" }            // 숨기기 (같이 켠 입자도 꺼져요)'),
+        'cgs: { 옥상_노을: "img:..." },\n\n{ cg: "옥상_노을" }   // 보여주기\n{ cg: "옥상_노을", flash: "white", particles: "sparkle" }  // 번쩍 + 반짝이와 함께\n"샬럿: 예쁘다…"\n{ cg: "" }            // 그만 보여주기 (같이 켠 입자도 꺼져요)\n{ cg: "", speed: "slow" }          // 천천히 사라지기\n{ cg: "옥상_노을", hideAfter: "tap" } // 탭하면 그만 보여주기 (hideAfter: 3000 은 3초 뒤)'),
       L("7. 변수 그림과 미니게임", "varImage 는 cases 목록을 위에서부터 확인해서 처음 맞는 조건의 그림을 보여줘요. minigame 은 일러스트(image) 위에 objects 를 놓고, 플레이어가 누른 오브젝트의 set 으로 변수를 바꿔요. x · y 는 그림 위 위치(%), picks 는 고를 수 있는 개수예요.",
         '{ varImage: "charlotte",\n  cases: [ { if: "호감도 >= 3", image: "smile" } ],\n  else: "pout" }\n\n{ minigame: "pick", image: "교실", picks: 1, labels: true,\n  objects: [\n    { name: "사탕", x: 30, y: 60, text: "달콤해 보인다.", set: { 호감도: +1 } },\n    { name: "숙제", x: 70, y: 55, hidden: true, text: "숨겨진 숙제를 찾았다!" },\n  ],\n  goto: "다음장면" }'),
       L("8. 입자 효과 · 색감 · 회상방", "particles 는 입자 모양, mode 는 나오는 방식(fall 흩날리기 / spread 퍼지기 / burst 터지기), x·y 는 화면에서의 위치(%)예요. memories 에 넣은 장면은 회상방에서 다시 볼 수 있어요.",

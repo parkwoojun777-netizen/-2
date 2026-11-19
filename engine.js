@@ -313,6 +313,11 @@
     const flatten = (l) => (Array.isArray(l) ? l : []).flatMap((b) => {
       if (b && typeof b === "object" && !Array.isArray(b) && Array.isArray(b.blocks) && b.group !== undefined) return flatten(b.blocks);
       if (b && typeof b === "object" && Array.isArray(b.cgSeq)) return expandSeq(b);
+      // 이벤트 그림 { cg, hideAfter: "tap" | 밀리초 } 는 탭하면 / 몇 초 뒤 그만 보여줘요
+      if (b && typeof b === "object" && b.cg && b.hideAfter) {
+        const { hideAfter, hideSpeed, ...show } = b;
+        return [show, hideAfter === "tap" ? { tap: true } : { wait: +hideAfter || 1000 }, { cg: "", speed: hideSpeed }];
+      }
       return [b];
     });
     const STORY = {};
@@ -381,7 +386,10 @@
     }
     const isOpen = (kind, name) => !!opts.unlockAll || load(SAVE_KEY + "_" + kind, []).includes(name);
 
-    function setCg(name, fit) {
+    function setCg(name, fit, cmd) {
+      // 그만 보여줄 때 빠르기: slow 천천히 · fast 빠르게 · now 바로 (기본 0.5초)
+      const sp = cmd && !name ? { slow: "1.6s", fast: ".25s", now: "0s" }[cmd.speed] : "";
+      el.cg.style.transition = sp ? `opacity ${sp}` : "";
       if (name && CGS[name]) unlock("cg", name);
       S.cg = name || ""; S.cgFit = fit || "";
       const src = name ? img(CGS[name] || name) : "";
@@ -393,7 +401,7 @@
         requestAnimationFrame(() => requestAnimationFrame(() => { el.cg2.style.transition = "opacity .6s"; el.cg2.style.opacity = 0; }));
       }
       // 이벤트 그림과 함께 켠 입자(계속)는 그림을 치우면 같이 꺼져요
-      if (!src && pfx.emits.some((e) => e.cmd && (e.cmd.cgLink || e.cmd.cg))) {
+      if (!src && !(cmd && cmd.keepFx) && pfx.emits.some((e) => e.cmd && (e.cmd.cgLink || e.cmd.cg))) {
         pfx.emits = pfx.emits.filter((e) => !(e.cmd && (e.cmd.cgLink || e.cmd.cg)));
         S.pfx = pfx.emits.map((e) => e.cmd);
       }
@@ -679,7 +687,7 @@
         if (cmd.act) charAct(cmd.act, cmd.motion);
         if (cmd.tap) { waitTap(); return; }
         if (cmd.bg) setBg(cmd.bg);
-        if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit);
+        if (cmd.cg !== undefined) setCg(cmd.cg, cmd.fit, cmd);
         if (cmd.show) {
           const prev = S.chars[cmd.show] || {};
           S.chars[cmd.show] = Object.assign({}, prev, { face: cmd.face || prev.face || "normal", pos: cmd.pos || prev.pos || "center" });

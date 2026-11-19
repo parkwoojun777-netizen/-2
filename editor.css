@@ -294,7 +294,7 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .seq-top { display: flex; gap: 10px; align-items: flex-start; }
 .seq-thumb { width: 96px; flex: none; aspect-ratio: 16 / 10; border-radius: 8px; background: #000 center / contain no-repeat; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; }
 .seq-thumb span { color: #8890a8; font-size: 11px; }
-.block.k-cgseq, .picker .k-cgseq { --kc: var(--k-scene); }
+.block.k-cgseq, .picker .k-cgseq, .block.k-cghide, .picker .k-cghide { --kc: var(--k-scene); }
 .block.k-sound, .picker .k-sound { --kc: var(--k-flow); }
 .sound-row .btn { padding: 7px 12px; }
 
