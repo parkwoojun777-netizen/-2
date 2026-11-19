@@ -293,7 +293,8 @@
       case "bg": return { bg: b.bg };
       case "cg": return { cg: b.cg || "", fit: b.fit || "contain",
         fx: b.shake ? "shake" : b.flash === "white" ? "flash" : b.flash ? "flashRed" : "",
-        shape: b.particles || "", mode: b.mode || "fall", x: b.x == null ? 50 : b.x, y: b.y == null ? 45 : b.y, amount: String(b.amount || 2) };
+        shape: b.particles || "", mode: b.mode || "fall", x: b.x == null ? 50 : b.x, y: b.y == null ? 45 : b.y, amount: String(b.amount || 2),
+        dir: b.dir == null ? null : b.dir, spread: b.spread == null ? null : b.spread, color: (b.color || PCOLOR[b.particles] || "#ffffff").toLowerCase() };
       case "show": return { id: b.show, face: b.face || "", pos: b.pos || "center" };
       case "hide": return { id: b.hide };
       case "set": return parseSetEntry(b.set);
@@ -354,7 +355,7 @@
         if (f.shape) {
           o.particles = f.shape;
           if (f.mode !== "fall") { o.mode = f.mode; o.x = Math.round(f.x); o.y = Math.round(f.y); }
-          if (+f.amount !== 2) o.amount = +f.amount;
+          pfxOut(o, f, { shape: "shape" });
         }
         return o;
       }
@@ -385,6 +386,7 @@
         const o = { cgSeq: f.steps.map((st) => { const r = {}; for (const k of ["image", "say", "text", "sound", "fx", "particles"]) if (st[k]) r[k] = st[k];
           if (st.particles && st.pmode && st.pmode !== "burst") r.pmode = st.pmode;
           if (st.particles && st.pmode !== "fall" && st.x != null) { r.x = Math.round(st.x); r.y = Math.round(st.y); }
+          if (st.particles) pfxOut(r, st, { shape: "particles" });
           return r; }) };
         if (f.fit === "cover") o.fit = "cover";
         if (f.after === "keep") o.after = "keep";
@@ -439,7 +441,7 @@
       case "say": return { name: firstChar ? proj.characters[firstChar].name : "나", text: "", face: "" };
       case "narr": return { text: "" };
       case "bg": return { bg: Object.keys(proj.backgrounds)[0] || "" };
-      case "cg": return { cg: Object.keys(proj.cgs)[0] || "", fit: "contain", fx: "", shape: "", mode: "fall", x: 50, y: 45, amount: "2" };
+      case "cg": return { cg: Object.keys(proj.cgs)[0] || "", fit: "contain", fx: "", shape: "", mode: "fall", x: 50, y: 45, amount: "2", dir: null, spread: null, color: "" };
       case "show": return { id: firstChar || "", face: firstChar ? Object.keys(proj.characters[firstChar].faces || {})[0] || "" : "", pos: "center" };
       case "hide": return { id: firstChar || "all" };
       case "set": return { var: vars[0] || "", op: "+", val: "1" };
@@ -923,6 +925,36 @@
       Object.keys(proj.characters).length ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: s.char, onchange: (e) => save("char", e.target.checked) }), "캐릭터도 같이 보기") : null);
   }
 
+  // ✨ 입자 설정 칸 (입자 효과 블록과 같은 것): 나오는 방식 · 어디서(위치) · 어디로(방향) · 색 · 양
+  // o 의 입자 이름은 k.shape, 방식은 k.mode 칸에 있어요
+  function pfxControls(o, k, modes, upd, redraw) {
+    const shape = o[k.shape], isCustom = PCOLOR[shape] === undefined;
+    if (!o.color) o.color = PCOLOR[shape] || "#ffffff";
+    if (o.amount == null || o.amount === "") o.amount = 2;
+    const selK = (key, opts, re) => h("select", { onchange: (e) => { o[key] = e.target.value; re ? redraw() : upd(); } },
+      Object.entries(opts).map(([v, t]) => h("option", { value: v, selected: String(v) === String(o[key] == null ? "" : o[key]) }, t)));
+    const point = o[k.mode] !== "fall";
+    const presets = { "캐릭터 얼굴": [50, 35], "가운데": [50, 50], "위쪽 (천장)": [50, 5], "아래 (바닥)": [50, 95], "왼쪽 위": [15, 15], "오른쪽 위": [85, 15] };
+    return [
+      field("나오는 방식", selK(k.mode, modes, true)),
+      point ? h("label", { class: "f" }, "📍 어디서 나올까요? (미리보기를 눌러도 돼요)",
+        h("div", { class: "row", style: { flexWrap: "wrap" } }, Object.entries(presets).map(([t, [x, y]]) => h("button", { class: "btn", style: { flex: "none", whiteSpace: "nowrap", padding: "6px 10px", fontSize: "13px" }, onclick: (e) => { e.preventDefault(); o.x = x; o.y = y; redraw(); } }, t)))) : null,
+      h("label", { class: "f" }, "🧭 어디로 나올까요? (방향)", dirPicker(o, upd, true)),
+      h("div", { class: "row" },
+        isCustom ? null : h("label", { class: "f", style: { flex: "none" } }, "색", h("input", { type: "color", value: o.color, oninput: (e) => { o.color = e.target.value; upd(); } })),
+        isCustom ? null : h("button", { class: "btn", style: { alignSelf: "flex-end" }, onclick: (e) => { e.preventDefault(); o.color = PCOLOR[shape]; redraw(); } }, "기본 색"),
+        field("양", selK("amount", { 1: "적게", 2: "보통", 3: "많이" }))),
+    ];
+  }
+  // 입자 설정을 블록 코드에 옮겨 적어요 (기본값은 빼고)
+  function pfxOut(o, src, k) {
+    const shape = src[k.shape];
+    if (src.dir != null) { o.dir = Math.round(src.dir); o.spread = Math.round(src.spread == null ? 60 : src.spread); }
+    if (PCOLOR[shape] !== undefined && src.color && src.color.toLowerCase() !== PCOLOR[shape]) o.color = src.color;
+    if (src.amount != null && +src.amount !== 2) o.amount = +src.amount;
+    return o;
+  }
+
   // 입자 고르기 목록 (없음 + 기본 효과 + 내 효과)
   const particleOpts = () => Object.assign({ "": "없음" }, PSHAPE, Object.fromEntries(Object.keys(proj.effects).map((n) => [n, "🎨 " + n])));
   // 바로 보이는 미리보기 화면: o.story() 블록을 실제 엔진으로 보여주고, o.point() 일 때 누른 곳을 o.pos.x/y 로 정해요
@@ -1201,8 +1233,8 @@
         field("대사 (비워 두면 그림만 보여주고 탭을 기다려요)", h("textarea", { value: st.text || "", placeholder: "예: 이 사진…… 기억나?", oninput: (e) => { st.text = e.target.value; upd(); pvUpd(j); } })),
         h("div", { class: "grid2" },
           field("효과", selOf(st.fx, SEQ_FX, (v) => { st.fx = v; upd(); pvUpd(j); })),
-          field("입자", selOf(st.particles, pOpts, (v) => { st.particles = v; redraw(); }))),
-        st.particles ? field("입자 나오는 방식", selOf(st.pmode || "burst", SEQ_PMODE, (v) => { st.pmode = v; redraw(); })) : null,
+          field("입자", selOf(st.particles, pOpts, (v) => { st.particles = v; st.color = PCOLOR[v] || ""; if (v) f._pvStep = j; redraw(); }))),
+        st.particles ? (st.pmode = st.pmode || "burst", pfxControls(st, { shape: "particles", mode: "pmode" }, SEQ_PMODE, () => { upd(); pvUpd(j); }, redraw)) : null,
         stepPreview(st, j));
     });
     return [
@@ -1615,9 +1647,10 @@
           up,
           h("div", { class: "opt-card" },
             h("b", {}, "✨ 그림과 함께 나올 효과"),
-            h("div", { class: "grid2" }, field("효과", sel("fx", SEQ_FX)), field("입자", sel("shape", particleOpts(), true))),
-            f.shape ? h("div", { class: "grid2" }, field("나오는 방식", sel("mode", PMODE, true)), field("양", sel("amount", { 1: "적게", 2: "보통", 3: "많이" }))) : null,
+            h("div", { class: "grid2" }, field("효과", sel("fx", SEQ_FX)), field("입자", h("select", { onchange: (e) => { f.shape = e.target.value; f.color = PCOLOR[f.shape] || ""; redraw(); } },
+              Object.entries(particleOpts()).map(([v, t]) => h("option", { value: v, selected: v === f.shape }, t))))),
             h("label", { class: "f" }, point ? "미리보기 — 누른 곳에서 입자가 나와요" : "미리보기", pv.box, pv.row),
+            f.shape ? pfxControls(f, { shape: "shape", mode: "mode" }, PMODE, upd, redraw) : null,
             f.shape && f.mode !== "burst" ? h("p", { class: "hint" }, "계속 나오는 입자는 [숨기기]로 이 그림을 치우면 같이 꺼져요.") : null)];
       }
       case "show": {

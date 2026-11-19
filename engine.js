@@ -303,7 +303,7 @@
         else if (st.fx === "flash") out.push({ flash: "white" });
         else if (st.fx === "flashRed") out.push({ flash: "#ff4d6d" });
         // 입자: 펑(한 번) · 그 자리에서 계속 · 화면 가득 계속 — 계속 나오는 건 그림을 치울 때 같이 꺼져요
-        if (st.particles) out.push({ particles: st.particles, mode: st.pmode || "burst", x: st.x == null ? 50 : st.x, y: st.y == null ? 45 : st.y, cgLink: true });
+        if (st.particles) out.push({ particles: st.particles, mode: st.pmode || "burst", x: st.x == null ? 50 : st.x, y: st.y == null ? 45 : st.y, dir: st.dir, spread: st.spread, color: st.color, amount: st.amount, cgLink: true });
         if (st.text) out.push(st.say ? { say: st.say, text: st.text } : { text: st.text });
         else out.push({ tap: true });
       });
